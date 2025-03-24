@@ -1,3 +1,4 @@
+import { warn } from 'console';
 import winston from 'winston';
 
 // Níveis de log personalizados
@@ -47,4 +48,30 @@ const Logger = winston.createLogger({
   transports,
 });
 
-export default Logger;
+function formatArg(arg: any): string {
+  if (typeof arg === 'object') {
+    try {
+      return JSON.stringify(arg);
+    } catch (e) {
+      return String(arg);
+    }
+  }
+  return String(arg);
+}
+
+export default {
+  info: (msg: string, ...args: any[]) => {
+    console.log(`${new Date().toISOString()} info: ${msg}
+    `, ...args.map(formatArg));
+  },
+  debug: (msg: string, ...args: any[]) => {
+    console.debug(`${new Date().toISOString()} debug: ${msg}`, ...args.map(formatArg));
+  },
+  error: (msg: string, ...args: any[]) => {
+    console.error(`${new Date().toISOString()} error: ${msg}`, ...args.map(formatArg));
+  },
+  warn: (msg: string, ...args: any[]) => {
+    console.warn(`${new Date().toISOString()} warn: ${msg}
+    `, ...args.map(formatArg));
+  },
+};

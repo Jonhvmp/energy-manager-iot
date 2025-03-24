@@ -146,14 +146,18 @@ class IoTDeviceSimulator {
 
     const statusTopic = `${this.config.topicPrefix}${this.config.id}/status`;
 
-    // Atualizar timestamp
+    // Atualizar timestamp e formatar batteryLevel com duas casas decimais
     this.status.lastSeen = Date.now();
+    const formattedStatus = {
+      ...this.status,
+      batteryLevel: Number(this.status.batteryLevel.toFixed(2))
+    };
 
-    this.client.publish(statusTopic, JSON.stringify(this.status), { qos: 1 }, (err) => {
+    this.client.publish(statusTopic, JSON.stringify(formattedStatus), { qos: 1 }, (err) => {
       if (err) {
         console.error(`Erro ao publicar status:`, err);
       } else {
-        console.log(`Status publicado para ${statusTopic}: ${JSON.stringify(this.status)}`);
+        console.log(`Status publicado para ${statusTopic}: ${JSON.stringify(formattedStatus)}`);
       }
     });
   }
