@@ -1,3 +1,8 @@
+<!-- Badges adicionados -->
+![Test Coverage](https://img.shields.io/badge/coverage-85.15%25-brightgreen)
+![npm version](https://img.shields.io/npm/v/energy-manager-iot)
+![NPM Downloads](https://img.shields.io/npm/dw/energy-manager-iot)
+
 # Energy Manager IoT
 
 Uma biblioteca Node.js para gerenciamento eficiente de energia em dispositivos IoT através do protocolo MQTT.

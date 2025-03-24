@@ -31,6 +31,7 @@
   "type": "commonjs",
   "description": "Biblioteca para gerenciamento de energia em dispositivos IoT via MQTT",
   "dependencies": {
+    "energy-manager-iot": "^1.0.0",
     "mqtt": "^5.0.3",
     "winston": "^3.10.0"
   },
