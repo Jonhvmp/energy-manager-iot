@@ -84,6 +84,9 @@ Confira a pasta `/examples` para ver exemplos de uso detalhados:
 - `device-simulator.ts`: Simulador de dispositivos IoT.
 - `advanced-usage.ts`: Exemplo avançado com monitoramento e comandos em grupo.
 
+**Exemplos Adicionais**
+- Execute `npm run example:simulator` para simular dispositivos e ver o EnergyManager em ação.
+
 ## API
 
 ### Classe Principal
