@@ -182,13 +182,3 @@ Os comandos são enviados no formato:
 ## Desenvolvedor
 
 [Jonh Alex Paz de Lima](https://www.linkedin.com/in/jonhvmp)
-
-## Sponsors
-
-Apoie o desenvolvimento deste projeto:
-
-**Botão de Patrocínio:**
-<iframe src="https://github.com/sponsors/Jonhvmp/button" title="Sponsor Jonhvmp" height="32" width="114" style="border: 0; border-radius: 6px;"></iframe>
-
-**Cartão de Patrocínio:**
-<iframe src="https://github.com/sponsors/Jonhvmp/card" title="Sponsor Jonhvmp" height="225" width="600" style="border: 0;"></iframe>
