@@ -5,7 +5,15 @@ import { EnergyManagerError, ErrorType } from '../utils/error-handler';
 import Logger from '../utils/logger';
 
 /**
- * Gerencia registro e agrupamento de dispositivos IoT
+ * Manages IoT device registration and grouping
+ *
+ * This class provides a centralized registry for all IoT devices,
+ * with features for device management, grouping, and status updates.
+ * It enforces validation rules for device IDs and configurations.
+ *
+ * @remarks
+ * The registry maintains device-group relationships in both directions
+ * for efficient querying and management.
  */
 export class DeviceRegistry {
   private devices: Map<string, Device>;
@@ -17,7 +25,20 @@ export class DeviceRegistry {
   }
 
   /**
-   * Registra um novo dispositivo
+   * Registers a new device in the system
+   *
+   * @param id - Unique identifier for the device
+   * @param name - Human-readable device name
+   * @param type - Type of device from the DeviceType enum
+   * @param config - Optional device configuration parameters
+   * @param groups - Optional initial groups to assign the device to
+   * @returns The newly registered device object
+   * @throws {EnergyManagerError} If device ID is invalid or already exists
+   *
+   * @example
+   * ```ts
+   * registry.registerDevice('temp01', 'Kitchen Temperature', DeviceType.SENSOR);
+   * ```
    */
   public registerDevice(
     id: string,
@@ -26,31 +47,31 @@ export class DeviceRegistry {
     config: DeviceConfig = {},
     groups: string[] = []
   ): Device {
-    // Validar ID
+    // Validate ID
     if (!validateDeviceId(id)) {
       throw new EnergyManagerError(
-        `ID de dispositivo inválido: ${id}`,
+        `Invalid device ID: ${id}`,
         ErrorType.VALIDATION
       );
     }
 
-    // Verificar se o dispositivo já existe
+    // Check if device already exists
     if (this.devices.has(id)) {
       throw new EnergyManagerError(
-        `Dispositivo com ID ${id} já existe`,
+        `Device with ID ${id} already exists`,
         ErrorType.VALIDATION
       );
     }
 
-    // Validar configuração
+    // Validate configuration
     if (!validateDeviceConfig(config)) {
       throw new EnergyManagerError(
-        `Configuração inválida para dispositivo ${id}`,
+        `Invalid configuration for device ${id}`,
         ErrorType.VALIDATION
       );
     }
 
-    // Criar dispositivo
+    // Create device
     const now = Date.now();
     const device: Device = {
       id,
@@ -62,27 +83,32 @@ export class DeviceRegistry {
       updatedAt: now
     };
 
-    // Adicionar aos grupos especificados
+    // Add to specified groups
     if (groups.length > 0) {
       for (const groupName of groups) {
         this.addDeviceToGroup(id, groupName, device);
       }
     }
 
-    // Armazenar dispositivo
+    // Store device
     this.devices.set(id, device);
-    Logger.info(`Dispositivo registrado: ${id} (${name})`);
+    Logger.info(`Device registered: ${id} (${name})`);
 
     return device;
   }
 
   /**
-   * Atualiza um dispositivo existente
+   * Updates an existing device's properties
+   *
+   * @param id - ID of the device to update
+   * @param updates - Object containing properties to update
+   * @returns The updated device object
+   * @throws {EnergyManagerError} If device not found or configuration is invalid
    */
   public updateDevice(id: string, updates: Partial<Omit<Device, 'id' | 'createdAt'>>): Device {
     const device = this.getDevice(id);
 
-    // Atualizar propriedades
+    // Update properties
     if (updates.name) {
       device.name = updates.name;
     }
@@ -92,55 +118,63 @@ export class DeviceRegistry {
     }
 
     if (updates.config) {
-      // Validar nova configuração
+      // Validate new configuration
       if (!validateDeviceConfig(updates.config)) {
         throw new EnergyManagerError(
-          `Configuração inválida para dispositivo ${id}`,
+          `Invalid configuration for device ${id}`,
           ErrorType.VALIDATION
         );
       }
       device.config = { ...device.config, ...updates.config };
     }
 
-    // Atualizar timestamp
+    // Update timestamp
     device.updatedAt = Date.now();
 
-    // Atualizar no mapa
+    // Update in map
     this.devices.set(id, device);
-    Logger.info(`Dispositivo atualizado: ${id}`);
+    Logger.info(`Device updated: ${id}`);
 
     return device;
   }
 
   /**
-   * Atualiza o status de um dispositivo
+   * Updates a device's status information
+   *
+   * @param id - ID of the device to update
+   * @param status - New status information
+   * @returns The updated device object
+   * @throws {EnergyManagerError} If device not found
    */
   public updateDeviceStatus(id: string, status: DeviceStatus): Device {
     const device = this.getDevice(id);
 
-    // Atualizar status e timestamp
+    // Update status and timestamp
     device.status = status;
     device.updatedAt = Date.now();
 
-    // Atualizar no mapa
+    // Update in map
     this.devices.set(id, device);
-    Logger.debug(`Status atualizado para dispositivo ${id}`);
+    Logger.debug(`Status updated for device ${id}`);
 
     return device;
   }
 
   /**
-   * Remove um dispositivo
+   * Removes a device from the registry and all its groups
+   *
+   * @param id - ID of the device to remove
+   * @returns True if device was found and removed, false otherwise
    */
   public removeDevice(id: string): boolean {
     if (!this.devices.has(id)) {
       return false;
     }
 
-    // Obter grupos do dispositivo
+    // Get device's groups
     const device = this.devices.get(id)!;
 
-    // Remover de todos os grupos
+    // Remove from all groups
     for (const groupName of device.groups) {
       const group = this.groups.get(groupName);
       if (group) {
@@ -148,21 +182,25 @@ export class DeviceRegistry {
       }
     }
 
-    // Remover do registro
+    // Remove from registry
     this.devices.delete(id);
-    Logger.info(`Dispositivo removido: ${id}`);
+    Logger.info(`Device removed: ${id}`);
 
     return true;
   }
 
   /**
-   * Obtém um dispositivo por ID
+   * Retrieves a device by its ID
+   *
+   * @param id - ID of the device to retrieve
+   * @returns The device object
+   * @throws {EnergyManagerError} If device not found
    */
   public getDevice(id: string): Device {
     const device = this.devices.get(id);
     if (!device) {
       throw new EnergyManagerError(
-        `Dispositivo não encontrado: ${id}`,
+        `Device not found: ${id}`,
         ErrorType.DEVICE_NOT_FOUND
       );
     }
@@ -170,95 +208,113 @@ export class DeviceRegistry {
   }
 
   /**
-   * Verifica se um dispositivo existe
+   * Checks if a device exists in the registry
+   *
+   * @param id - ID of the device to check
+   * @returns True if device exists, false otherwise
    */
   public hasDevice(id: string): boolean {
     return this.devices.has(id);
   }
 
   /**
-   * Cria um novo grupo
+   * Creates a new device group
+   *
+   * @param name - Name for the new group
+   * @returns True if group was created, false if it already exists
+   * @throws {EnergyManagerError} If group name is invalid
    */
   public createGroup(name: string): boolean {
-    // Validar nome do grupo
+    // Validate group name
     if (!validateGroupName(name)) {
       throw new EnergyManagerError(
-        `Nome de grupo inválido: ${name}`,
+        `Invalid group name: ${name}`,
         ErrorType.VALIDATION
       );
     }
 
-    // Verificar se o grupo já existe
+    // Check if group already exists
     if (this.groups.has(name)) {
       return false;
     }
 
-    // Criar grupo vazio
+    // Create empty group
     this.groups.set(name, new Set<string>());
-    Logger.info(`Grupo criado: ${name}`);
+    Logger.info(`Group created: ${name}`);
 
     return true;
   }
 
   /**
-   * Adiciona um dispositivo a um grupo
+   * Adds a device to a group
+   *
+   * @param deviceId - ID of the device to add
+   * @param groupName - Name of the group to add the device to
+   * @param device - Optional device object (to avoid lookup if already available)
+   * @returns True if the device was added to the group
+   * @throws {EnergyManagerError} If group name is invalid or device not found
    */
   public addDeviceToGroup(deviceId: string, groupName: string, device?: Device): boolean {
-    // Validar nome do grupo
+    // Validate group name
     if (!validateGroupName(groupName)) {
       throw new EnergyManagerError(
-        `Nome de grupo inválido: ${groupName}`,
+        `Invalid group name: ${groupName}`,
         ErrorType.VALIDATION
       );
     }
 
-    // Obter ou criar o grupo
+    // Get or create the group
     if (!this.groups.has(groupName)) {
       this.createGroup(groupName);
     }
 
-    // Referência ao dispositivo
+    // Device reference
     const deviceRef = device || this.getDevice(deviceId);
 
-    // Adicionar ao grupo
+    // Add to group
     const group = this.groups.get(groupName)!;
     group.add(deviceId);
 
-    // Adicionar grupo ao dispositivo se ainda não estiver lá
+    // Add group to device if not already there
     if (!deviceRef.groups.includes(groupName)) {
       deviceRef.groups.push(groupName);
       deviceRef.updatedAt = Date.now();
       this.devices.set(deviceId, deviceRef);
     }
 
-    Logger.debug(`Dispositivo ${deviceId} adicionado ao grupo ${groupName}`);
+    Logger.debug(`Device ${deviceId} added to group ${groupName}`);
     return true;
   }
 
   /**
-   * Remove um dispositivo de um grupo
+   * Removes a device from a group
+   *
+   * @param deviceId - ID of the device to remove
+   * @param groupName - Name of the group to remove the device from
+   * @returns True if the device was removed from the group
+   * @throws {EnergyManagerError} If group not found
    */
   public removeDeviceFromGroup(deviceId: string, groupName: string): boolean {
-    // Verificar se o grupo existe
+    // Check if group exists
     if (!this.groups.has(groupName)) {
       throw new EnergyManagerError(
-        `Grupo não encontrado: ${groupName}`,
+        `Group not found: ${groupName}`,
         ErrorType.GROUP_NOT_FOUND
       );
     }
 
-    // Remover do grupo
+    // Remove from group
     const group = this.groups.get(groupName)!;
     const removed = group.delete(deviceId);
 
     if (removed) {
-      // Remover grupo da lista de grupos do dispositivo
+      // Remove group from device's group list
       const device = this.devices.get(deviceId);
       if (device) {
         device.groups = device.groups.filter(g => g !== groupName);
         device.updatedAt = Date.now();
         this.devices.set(deviceId, device);
-        Logger.debug(`Dispositivo ${deviceId} removido do grupo ${groupName}`);
+        Logger.debug(`Device ${deviceId} removed from group ${groupName}`);
       }
     }
 
@@ -266,18 +322,21 @@ export class DeviceRegistry {
   }
 
   /**
-   * Remove um grupo e desassocia todos os dispositivos
+   * Removes a group and disassociates all devices from it
+   *
+   * @param name - Name of the group to remove
+   * @returns True if group was found and removed
    */
   public removeGroup(name: string): boolean {
-    // Verificar se o grupo existe
+    // Check if group exists
     if (!this.groups.has(name)) {
       return false;
     }
 
-    // Obter dispositivos no grupo
+    // Get devices in group
     const group = this.groups.get(name)!;
 
-    // Remover o grupo de cada dispositivo
+    // Remove group from each device
     for (const deviceId of group) {
       const device = this.devices.get(deviceId);
       if (device) {
@@ -287,21 +346,25 @@ export class DeviceRegistry {
       }
     }
 
-    // Remover o grupo
+    // Remove the group
     this.groups.delete(name);
-    Logger.info(`Grupo removido: ${name}`);
+    Logger.info(`Group removed: ${name}`);
 
     return true;
   }
 
   /**
-   * Obtém todos os dispositivos de um grupo
+   * Retrieves all devices in a group
+   *
+   * @param groupName - Name of the group to query
+   * @returns Array of devices in the group
+   * @throws {EnergyManagerError} If group not found
    */
   public getDevicesInGroup(groupName: string): Device[] {
-    // Verificar se o grupo existe
+    // Check if group exists
     if (!this.groups.has(groupName)) {
       throw new EnergyManagerError(
-        `Grupo não encontrado: ${groupName}`,
+        `Group not found: ${groupName}`,
         ErrorType.GROUP_NOT_FOUND
       );
     }
@@ -309,7 +372,7 @@ export class DeviceRegistry {
     const group = this.groups.get(groupName)!;
     const devices: Device[] = [];
 
-    // Coletar todos os dispositivos do grupo
+    // Collect all devices in the group
     for (const deviceId of group) {
       const device = this.devices.get(deviceId);
       if (device) {
@@ -321,13 +384,17 @@ export class DeviceRegistry {
   }
 
   /**
-   * Obtém IDs de todos os dispositivos de um grupo
+   * Retrieves IDs of all devices in a group
+   *
+   * @param groupName - Name of the group to query
+   * @returns Array of device IDs in the group
+   * @throws {EnergyManagerError} If group not found
    */
   public getDeviceIdsInGroup(groupName: string): string[] {
-    // Verificar se o grupo existe
+    // Check if group exists
     if (!this.groups.has(groupName)) {
       throw new EnergyManagerError(
-        `Grupo não encontrado: ${groupName}`,
+        `Group not found: ${groupName}`,
         ErrorType.GROUP_NOT_FOUND
       );
     }
@@ -336,21 +403,27 @@ export class DeviceRegistry {
   }
 
   /**
-   * Obtém todos os grupos existentes
+   * Retrieves all existing group names
+   *
+   * @returns Array of group names
    */
   public getAllGroups(): string[] {
     return Array.from(this.groups.keys());
   }
 
   /**
-   * Obtém todos os dispositivos
+   * Retrieves all devices in the registry
+   *
+   * @returns Array of all devices
    */
   public getAllDevices(): Device[] {
     return Array.from(this.devices.values());
   }
 
   /**
-   * Obtém todos os IDs de dispositivos
+   * Retrieves all device IDs in the registry
+   *
+   * @returns Array of all device IDs
    */
   public getAllDeviceIds(): string[] {
     return Array.from(this.devices.keys());

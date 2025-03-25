@@ -5,17 +5,34 @@ import { validateMqttBrokerUrl } from '../utils/validators';
 import { EnergyManagerError, ErrorType } from '../utils/error-handler';
 
 /**
- * Opções de configuração para o manipulador MQTT
+ * Configuration options for the MQTT handler
  */
 export interface MqttHandlerOptions {
+  /** Optional client ID for MQTT connection */
   clientId?: string;
+
+  /** Whether to create a clean session, defaults to true */
   clean?: boolean;
+
+  /** Keepalive interval in seconds, defaults to 60 */
   keepalive?: number;
+
+  /** Reconnection period in milliseconds, defaults to 5000 */
   reconnectPeriod?: number;
+
+  /** Connection timeout in milliseconds, defaults to 30000 */
   connectTimeout?: number;
+
+  /** Username for MQTT authentication */
   username?: string;
+
+  /** Password for MQTT authentication */
   password?: string;
+
+  /** Whether to use SSL connection, defaults to false */
   ssl?: boolean;
+
+  /** Last Will and Testament message configuration */
   will?: {
     topic: string;
     payload: string;
@@ -25,7 +42,15 @@ export interface MqttHandlerOptions {
 }
 
 /**
- * Manipulador de conexões MQTT
+ * Handles MQTT connections and message routing
+ *
+ * This class provides a wrapper around the MQTT client library with
+ * additional features for connection management, topic subscription,
+ * and message handling.
+ *
+ * @remarks
+ * MqttHandler extends EventEmitter to provide notification of connection
+ * state changes and received messages.
  */
 export class MqttHandler extends EventEmitter {
   private client: mqtt.MqttClient | null = null;
@@ -35,12 +60,14 @@ export class MqttHandler extends EventEmitter {
   private topicSubscriptions: Map<string, (topic: string, payload: Buffer) => void>;
 
   /**
-   * Cria nova instância do manipulador MQTT
+   * Creates a new MQTT handler instance
+   *
+   * @param options - Configuration options for the MQTT connection
    */
   constructor(options: MqttHandlerOptions = {}) {
     super();
 
-    // Define opções padrão
+    // Default options
     this.options = {
       clientId: `energy-manager-${Math.random().toString(16).substring(2, 10)}`,
       clean: true,
@@ -54,25 +81,30 @@ export class MqttHandler extends EventEmitter {
   }
 
   /**
-   * Conecta ao broker MQTT
+   * Connects to the MQTT broker
+   *
+   * @param brokerUrl - URL of the MQTT broker
+   * @param options - Additional connection options to override defaults
+   * @returns Promise that resolves when connected or rejects on error
+   * @throws {EnergyManagerError} If broker URL is invalid or connection fails
    */
   public connect(brokerUrl: string, options?: MqttHandlerOptions): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!validateMqttBrokerUrl(brokerUrl)) {
-        reject(new EnergyManagerError('URL do broker MQTT inválida', ErrorType.VALIDATION));
+        reject(new EnergyManagerError('Invalid MQTT broker URL', ErrorType.VALIDATION));
         return;
       }
 
       this.brokerUrl = brokerUrl;
 
-      // Mesclar opções
+      // Merge options
       const mqttOptions = { ...this.options, ...options };
 
       try {
         this.client = mqtt.connect(brokerUrl, mqttOptions);
 
         this.client.on('connect', () => {
-          Logger.info(`Conectado ao broker MQTT: ${brokerUrl}`);
+          Logger.info(`Connected to MQTT broker: ${brokerUrl}`);
           this.isConnected = true;
           this.emit('connect');
           resolve();
@@ -83,31 +115,34 @@ export class MqttHandler extends EventEmitter {
         });
 
         this.client.on('reconnect', () => {
-          Logger.warn('Tentando reconectar ao broker MQTT...');
+          Logger.warn('Attempting to reconnect to MQTT broker...');
           this.emit('reconnect');
         });
 
         this.client.on('error', (err) => {
-          Logger.error(`Erro na conexão MQTT: ${err.message}`);
+          Logger.error(`MQTT connection error: ${err.message}`);
           this.emit('error', err);
-          reject(new EnergyManagerError(`Falha na conexão MQTT: ${err.message}`, ErrorType.CONNECTION, err));
+          reject(new EnergyManagerError(`MQTT connection failed: ${err.message}`, ErrorType.CONNECTION, err));
         });
 
         this.client.on('offline', () => {
-          Logger.warn('Cliente MQTT desconectado');
+          Logger.warn('MQTT client disconnected');
           this.isConnected = false;
           this.emit('offline');
         });
 
       } catch (err: any) {
-        Logger.error(`Exceção ao conectar ao MQTT: ${err.message}`);
-        reject(new EnergyManagerError(`Exceção na conexão MQTT: ${err.message}`, ErrorType.CONNECTION, err));
+        Logger.error(`Exception connecting to MQTT: ${err.message}`);
+        reject(new EnergyManagerError(`MQTT connection exception: ${err.message}`, ErrorType.CONNECTION, err));
       }
     });
   }
 
   /**
-   * Desconecta do broker MQTT
+   * Disconnects from the MQTT broker
+   *
+   * @returns Promise that resolves when disconnected or rejects on error
+   * @throws {EnergyManagerError} If disconnection fails
    */
   public disconnect(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -118,9 +153,9 @@ export class MqttHandler extends EventEmitter {
 
       this.client.end(false, {}, (err) => {
         if (err) {
-          reject(new EnergyManagerError(`Erro ao desconectar: ${err.message}`, ErrorType.CONNECTION, err));
+          reject(new EnergyManagerError(`Disconnect error: ${err.message}`, ErrorType.CONNECTION, err));
         } else {
-          Logger.info('Desconectado do broker MQTT');
+          Logger.info('Disconnected from MQTT broker');
           this.isConnected = false;
           this.client = null;
           resolve();
@@ -130,12 +165,18 @@ export class MqttHandler extends EventEmitter {
   }
 
   /**
-   * Publica mensagem em um tópico
+   * Publishes a message to an MQTT topic
+   *
+   * @param topic - MQTT topic to publish to
+   * @param message - Message content (string or object that will be JSON stringified)
+   * @param options - Publish options like QoS level and retain flag
+   * @returns Promise that resolves when published or rejects on error
+   * @throws {EnergyManagerError} If not connected or publish fails
    */
   public publish(topic: string, message: string | object, options?: mqtt.IClientPublishOptions): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.client || !this.isConnected) {
-        reject(new EnergyManagerError('Não conectado ao broker MQTT', ErrorType.CONNECTION));
+        reject(new EnergyManagerError('Not connected to MQTT broker', ErrorType.CONNECTION));
         return;
       }
 
@@ -150,10 +191,10 @@ export class MqttHandler extends EventEmitter {
 
       this.client.publish(topic, payload, publishOptions, (err) => {
         if (err) {
-          Logger.error(`Erro ao publicar em ${topic}: ${err.message}`);
-          reject(new EnergyManagerError(`Falha ao publicar mensagem: ${err.message}`, ErrorType.COMMAND_FAILED, err));
+          Logger.error(`Error publishing to ${topic}: ${err.message}`);
+          reject(new EnergyManagerError(`Failed to publish message: ${err.message}`, ErrorType.COMMAND_FAILED, err));
         } else {
-          Logger.debug(`Mensagem publicada em ${topic}: ${payload}`);
+          Logger.debug(`Message published to ${topic}: ${payload}`);
           resolve();
         }
       });
@@ -161,26 +202,31 @@ export class MqttHandler extends EventEmitter {
   }
 
   /**
-   * Assina um tópico
+   * Subscribes to an MQTT topic
+   *
+   * @param topic - MQTT topic to subscribe to
+   * @param callback - Optional callback function for this specific topic
+   * @returns Promise that resolves when subscribed or rejects on error
+   * @throws {EnergyManagerError} If not connected or subscribe fails
    */
   public subscribe(topic: string, callback?: (topic: string, payload: Buffer) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.client || !this.isConnected) {
-        reject(new EnergyManagerError('Não conectado ao broker MQTT', ErrorType.CONNECTION));
+        reject(new EnergyManagerError('Not connected to MQTT broker', ErrorType.CONNECTION));
         return;
       }
 
-      // Registrar callback se fornecido
+      // Register callback if provided
       if (callback) {
         this.topicSubscriptions.set(topic, callback);
       }
 
       this.client.subscribe(topic, { qos: 1 }, (err) => {
         if (err) {
-          Logger.error(`Erro ao assinar tópico ${topic}: ${err.message}`);
-          reject(new EnergyManagerError(`Falha ao assinar tópico: ${err.message}`, ErrorType.COMMAND_FAILED, err));
+          Logger.error(`Error subscribing to topic ${topic}: ${err.message}`);
+          reject(new EnergyManagerError(`Failed to subscribe to topic: ${err.message}`, ErrorType.COMMAND_FAILED, err));
         } else {
-          Logger.info(`Assinado tópico: ${topic}`);
+          Logger.info(`Subscribed to topic: ${topic}`);
           resolve();
         }
       });
@@ -188,24 +234,28 @@ export class MqttHandler extends EventEmitter {
   }
 
   /**
-   * Cancela assinatura de um tópico
+   * Unsubscribes from an MQTT topic
+   *
+   * @param topic - MQTT topic to unsubscribe from
+   * @returns Promise that resolves when unsubscribed or rejects on error
+   * @throws {EnergyManagerError} If not connected or unsubscribe fails
    */
   public unsubscribe(topic: string): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.client || !this.isConnected) {
-        reject(new EnergyManagerError('Não conectado ao broker MQTT', ErrorType.CONNECTION));
+        reject(new EnergyManagerError('Not connected to MQTT broker', ErrorType.CONNECTION));
         return;
       }
 
-      // Remover callback registrado
+      // Remove registered callback
       this.topicSubscriptions.delete(topic);
 
       this.client.unsubscribe(topic, (err) => {
         if (err) {
-          Logger.error(`Erro ao cancelar assinatura do tópico ${topic}: ${err.message}`);
-          reject(new EnergyManagerError(`Falha ao cancelar assinatura: ${err.message}`, ErrorType.COMMAND_FAILED, err));
+          Logger.error(`Error unsubscribing from topic ${topic}: ${err.message}`);
+          reject(new EnergyManagerError(`Failed to unsubscribe from topic: ${err.message}`, ErrorType.COMMAND_FAILED, err));
         } else {
-          Logger.info(`Cancelada assinatura do tópico: ${topic}`);
+          Logger.info(`Unsubscribed from topic: ${topic}`);
           resolve();
         }
       });
@@ -213,28 +263,31 @@ export class MqttHandler extends EventEmitter {
   }
 
   /**
-   * Verifica se está conectado ao broker
+   * Checks if connected to the MQTT broker
+   *
+   * @returns True if connected to the broker
    */
   public isClientConnected(): boolean {
     return this.isConnected && !!this.client;
   }
 
   /**
-   * Gerencia mensagens recebidas
+   * Handles incoming MQTT messages
+   * @private
    */
   private handleMessage(topic: string, payload: Buffer): void {
-    Logger.debug(`Mensagem recebida no tópico ${topic}`);
+    Logger.debug(`Message received on topic ${topic}`);
 
-    // Emitir evento para todos ouvirem
+    // Emit event for all listeners
     this.emit('message', topic, payload);
 
-    // Chamar callback específico se registrado
+    // Call specific callback if registered
     const callback = this.topicSubscriptions.get(topic);
     if (callback) {
       try {
         callback(topic, payload);
       } catch (err: any) {
-        Logger.error(`Erro no callback para tópico ${topic}: ${err.message}`);
+        Logger.error(`Error in callback for topic ${topic}: ${err.message}`);
       }
     }
   }
