@@ -2,10 +2,16 @@ import { MqttHandler, MqttHandlerOptions } from '../lib/mqtt-handler';
 import * as mqtt from 'mqtt';
 import { EnergyManagerError, ErrorType } from '../utils/error-handler';
 
-// Usar o mock global, sem redefinir
+// Use global mock, without redefining
 jest.mock('mqtt');
 
-describe('MqttHandler - Testes Avançados', () => {
+/**
+ * Advanced tests for the MqttHandler class
+ *
+ * These tests focus on edge cases and error handling in the MQTT handler,
+ * particularly around publishing, subscribing, and connection failures.
+ */
+describe('MqttHandler - Advanced Tests', () => {
   let mqttHandler: MqttHandler;
   let mockClient: any;
   let callbacks: Record<string, Function> = {};
@@ -14,11 +20,11 @@ describe('MqttHandler - Testes Avançados', () => {
     jest.clearAllMocks();
     callbacks = {};
 
-    // Obter o mock client existente do mock global
+    // Get the existing mock client from global mock
     const mockImplementation = (mqtt.connect as jest.Mock).getMockImplementation();
     mockClient = mockImplementation ? mockImplementation() : {};
 
-    // Sobrescrever a implementação do mockClient.on para este teste
+    // Override mockClient.on implementation for this test
     mockClient.on.mockImplementation((event: string, callback: Function) => {
       callbacks[event] = callback;
       return mockClient;
@@ -38,108 +44,108 @@ describe('MqttHandler - Testes Avançados', () => {
     }
   });
 
-  describe('Erros de Publicação', () => {
-    test('deve rejeitar quando publicação falhar', async () => {
-      // Conectar primeiro
+  describe('Publication Errors', () => {
+    test('should reject when publication fails', async () => {
+      // Connect first
       const connectPromise = mqttHandler.connect('mqtt://localhost:1883');
-      callbacks['connect'] && callbacks['connect'](); // Simular evento connect
+      callbacks['connect'] && callbacks['connect'](); // Simulate connect event
       await connectPromise;
 
-      // Mock de erro na publicação
+      // Mock publication error
       mockClient.publish.mockImplementationOnce((_topic: string, _message: string, _opts: object, cb?: Function) => {
         if (cb) cb(new Error('Publish failed'));
       });
 
-      // Tentar publicar
+      // Try to publish
       await expect(mqttHandler.publish('test/topic', 'message')).rejects.toThrow(EnergyManagerError);
     });
 
-    test('deve rejeitar quando assinatura falhar', async () => {
-      // Conectar primeiro
+    test('should reject when subscription fails', async () => {
+      // Connect first
       const connectPromise = mqttHandler.connect('mqtt://localhost:1883');
       callbacks['connect'] && callbacks['connect']();
       await connectPromise;
 
-      // Mock de erro na assinatura
+      // Mock subscription error
       mockClient.subscribe.mockImplementationOnce((_topic: string, _opts: object, cb?: Function) => {
         if (cb) cb(new Error('Subscribe failed'));
       });
 
-      // Tentar assinar
+      // Try to subscribe
       await expect(mqttHandler.subscribe('test/topic')).rejects.toThrow(EnergyManagerError);
     });
 
-    test('deve rejeitar quando cancelamento de assinatura falhar', async () => {
-      // Conectar primeiro
+    test('should reject when unsubscription fails', async () => {
+      // Connect first
       const connectPromise = mqttHandler.connect('mqtt://localhost:1883');
       callbacks['connect'] && callbacks['connect']();
       await connectPromise;
 
-      // Mock de erro no cancelamento
+      // Mock unsubscription error
       mockClient.unsubscribe.mockImplementationOnce((_topic: string, cb?: Function) => {
         if (cb) cb(new Error('Unsubscribe failed'));
       });
 
-      // Tentar cancelar assinatura
+      // Try to unsubscribe
       await expect(mqttHandler.unsubscribe('test/topic')).rejects.toThrow(EnergyManagerError);
     });
   });
 
-  describe('Exceções de inicialização', () => {
-    test('deve tratar exceções ao criar cliente MQTT', async () => {
-      // Simular erro de exceção durante conexão
+  describe('Initialization Exceptions', () => {
+    test('should handle exceptions when creating MQTT client', async () => {
+      // Simulate exception error during connection
       jest.spyOn(mqtt, 'connect').mockImplementationOnce(() => {
         throw new Error('Connection setup failed');
       });
 
-      // Tentar conectar
+      // Try to connect
       await expect(mqttHandler.connect('mqtt://localhost:1883')).rejects.toThrow(EnergyManagerError);
     });
 
-    test('deve tratar desconexão quando cliente já está desconectado', async () => {
-      // Cliente não inicializado
+    test('should handle disconnection when client is already disconnected', async () => {
+      // Client not initialized
       const result = await mqttHandler.disconnect();
       expect(result).toBeUndefined();
     });
 
-    test('deve rejeitar quando desconexão falhar', async () => {
-      // Conectar primeiro
+    test('should reject when disconnection fails', async () => {
+      // Connect first
       const connectPromise = mqttHandler.connect('mqtt://localhost:1883');
       callbacks['connect'] && callbacks['connect']();
       await connectPromise;
 
-      // Mock de erro na desconexão
+      // Mock disconnection error
       mockClient.end.mockImplementationOnce((force: boolean, opts: object, cb: Function) => {
         cb(new Error('Disconnect failed'));
       });
 
-      // Tentar desconectar
+      // Try to disconnect
       await expect(mqttHandler.disconnect()).rejects.toThrow(EnergyManagerError);
     });
   });
 
-  describe('Manipulação de mensagens', () => {
-    test('deve tratar erros em callbacks de tópicos', async () => {
-      // Conectar primeiro
+  describe('Message Handling', () => {
+    test('should handle errors in topic callbacks', async () => {
+      // Connect first
       const connectPromise = mqttHandler.connect('mqtt://localhost:1883');
       callbacks['connect'] && callbacks['connect']();
       await connectPromise;
 
-      // Registrar callback com erro
+      // Register callback with error
       const errorCallback = jest.fn(() => {
         throw new Error('Callback error');
       });
       await mqttHandler.subscribe('test/error', errorCallback);
 
-      // Não deve lançar erro mesmo com falha no callback
+      // Should not throw error even with callback failure
       const message = Buffer.from('test');
 
-      // Simular recebimento de mensagem
+      // Simulate message reception
       expect(() => {
         callbacks['message'] && callbacks['message']('test/error', message);
       }).not.toThrow();
 
-      // Callback deve ter sido chamado
+      // Callback should have been called
       expect(errorCallback).toHaveBeenCalled();
     });
   });

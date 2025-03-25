@@ -2,7 +2,14 @@ import { MqttHandler } from '../lib/mqtt-handler';
 import * as mqtt from 'mqtt';
 import { EnergyManagerError } from '../utils/error-handler';
 
-// Usar o mock global do MQTT, sem tentar redefinir
+/**
+ * Main tests for the MqttHandler class
+ *
+ * This test suite covers the core functionality of the MQTT handler,
+ * including connection management, message publication and subscription.
+ */
+
+// Use global MQTT mock, without trying to redefine
 jest.mock('mqtt');
 
 describe('MqttHandler', () => {
@@ -13,7 +20,7 @@ describe('MqttHandler', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Criar handlers para os eventos
+    // Create handlers for events
     mockHandlers = {
       connect: jest.fn(),
       message: jest.fn(),
@@ -22,7 +29,7 @@ describe('MqttHandler', () => {
       offline: jest.fn()
     };
 
-    // Criar um mock client
+    // Create a mock client
     mockClient = {
       on: jest.fn(),
       publish: jest.fn(),
@@ -30,7 +37,7 @@ describe('MqttHandler', () => {
       end: jest.fn()
     };
 
-    // Adicionar implementação para subscribe invocar callback imediatamente
+    // Add implementation for subscribe to invoke callback immediately
     mockClient.subscribe.mockImplementation((topic: string, opts: any, cb: Function) => {
       cb(null);
       return mockClient;
@@ -38,7 +45,7 @@ describe('MqttHandler', () => {
 
     (mqtt.connect as jest.Mock).mockReturnValue(mockClient);
 
-    // Configurar o cliente para usar nossos handlers
+    // Configure client to use our handlers
     mockClient.on.mockImplementation((event: string, callback: Function) => {
       mockHandlers[event] = callback;
       return mockClient;
@@ -46,7 +53,7 @@ describe('MqttHandler', () => {
 
     mqttHandler = new MqttHandler({
       clientId: 'test-client',
-      // Configurações para evitar timeouts
+      // Settings to avoid timeouts
       connectTimeout: 1,
       reconnectPeriod: 0
     });
@@ -59,19 +66,19 @@ describe('MqttHandler', () => {
     jest.clearAllMocks();
   });
 
-  describe('Conexão', () => {
-    test('deve lançar erro com URL inválida', async () => {
+  describe('Connection', () => {
+    test('should throw error with invalid URL', async () => {
       await expect(mqttHandler.connect('invalid-url')).rejects.toThrow(EnergyManagerError);
     });
 
-    test('deve conectar com sucesso e emitir evento', async () => {
+    test('should connect successfully and emit event', async () => {
       const connectPromise = mqttHandler.connect('mqtt://localhost:1883');
 
-      // Simular evento de conexão
+      // Simulate connection event
       const connectListener = jest.fn();
       mqttHandler.on('connect', connectListener);
 
-      // Acionar callback de conexão
+      // Trigger connect callback
       mockHandlers.connect();
 
       await connectPromise;
@@ -79,13 +86,13 @@ describe('MqttHandler', () => {
       expect(mqttHandler.isClientConnected()).toBe(true);
     });
 
-    test('deve emitir evento de erro na conexão', async () => {
+    test('should emit error event on connection error', async () => {
       const connectPromise = mqttHandler.connect('mqtt://localhost:1883');
 
       const errorListener = jest.fn();
       mqttHandler.on('error', errorListener);
 
-      // Simular erro
+      // Simulate error
       const error = new Error('Connection refused');
       mockHandlers.error(error);
 
@@ -94,64 +101,64 @@ describe('MqttHandler', () => {
     });
   });
 
-  describe('Publicação e Assinatura', () => {
-    test('deve falhar ao publicar quando desconectado', async () => {
+  describe('Publication and Subscription', () => {
+    test('should fail to publish when disconnected', async () => {
       await expect(mqttHandler.publish('test/topic', 'message')).rejects.toThrow(EnergyManagerError);
     });
 
-    test('deve processar mensagens recebidas', async () => {
-      // Conectar primeiro
+    test('should process received messages', async () => {
+      // Connect first
       const connectPromise = mqttHandler.connect('mqtt://localhost:1883');
       mockHandlers.connect();
       await connectPromise;
 
-      // Configurar listener para mensagens
+      // Set up listener for messages
       const messageListener = jest.fn();
       mqttHandler.on('message', messageListener);
 
-      // Assinar tópico com callback
+      // Subscribe to topic with callback
       const topicCallback = jest.fn();
       await mqttHandler.subscribe('test/topic', topicCallback);
 
-      // Simular recebimento de mensagem
+      // Simulate message reception
       const message = Buffer.from('test message');
       mockHandlers.message('test/topic', message);
 
-      // Verificar se ambos os callbacks foram chamados
+      // Verify both callbacks were called
       expect(messageListener).toHaveBeenCalledWith('test/topic', message);
       expect(topicCallback).toHaveBeenCalledWith('test/topic', message);
     });
   });
 
-  describe('Desconexão e Reconexão', () => {
-    test('deve lidar com desconexão', async () => {
-      // Conectar
+  describe('Disconnection and Reconnection', () => {
+    test('should handle disconnection', async () => {
+      // Connect
       const connectPromise = mqttHandler.connect('mqtt://localhost:1883');
       mockHandlers.connect();
       await connectPromise;
 
-      // Configurar listener para offline
+      // Set up listener for offline
       const offlineListener = jest.fn();
       mqttHandler.on('offline', offlineListener);
 
-      // Simular offline
+      // Simulate offline
       mockHandlers.offline();
 
       expect(offlineListener).toHaveBeenCalled();
       expect(mqttHandler.isClientConnected()).toBe(false);
     });
 
-    test('deve emitir evento na reconexão', async () => {
-      // Conectar
+    test('should emit event on reconnection', async () => {
+      // Connect
       const connectPromise = mqttHandler.connect('mqtt://localhost:1883');
       mockHandlers.connect();
       await connectPromise;
 
-      // Configurar listener para reconexão
+      // Set up listener for reconnection
       const reconnectListener = jest.fn();
       mqttHandler.on('reconnect', reconnectListener);
 
-      // Simular reconexão
+      // Simulate reconnection
       mockHandlers.reconnect();
 
       expect(reconnectListener).toHaveBeenCalled();

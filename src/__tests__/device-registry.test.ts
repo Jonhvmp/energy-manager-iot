@@ -3,7 +3,14 @@ import { DeviceType } from '../types/device';
 import { PowerMode, ConnectionStatus } from '../types/status';
 import { EnergyManagerError, ErrorType } from '../utils/error-handler';
 
-// Mock do módulo MQTT para evitar conexões reais durante o teste
+/**
+ * Tests for the DeviceRegistry class
+ *
+ * This test suite covers validation, device registration, management,
+ * and group operations of the DeviceRegistry.
+ */
+
+// Mock MQTT module to avoid real connections during tests
 jest.mock('mqtt', () => {
   const mockClient = {
     on: jest.fn().mockReturnThis(),
@@ -26,51 +33,51 @@ describe('DeviceRegistry', () => {
     registry = new DeviceRegistry();
   });
 
-  describe('Registro de Dispositivos', () => {
-    test('deve lançar erro ao registrar dispositivo com ID inválido', () => {
-      // IDs inválidos: vazio, muito curto ou com caracteres não permitidos
+  describe('Device Registration', () => {
+    test('should throw error when registering device with invalid ID', () => {
+      // Invalid IDs: empty, too short, or with disallowed characters
       expect(() => registry.registerDevice('', 'Device', DeviceType.SENSOR)).toThrow(EnergyManagerError);
       expect(() => registry.registerDevice('ab', 'Device', DeviceType.SENSOR)).toThrow(EnergyManagerError);
       expect(() => registry.registerDevice('device@123', 'Device', DeviceType.SENSOR)).toThrow(EnergyManagerError);
     });
 
-    test('deve lançar erro ao registrar dispositivo duplicado', () => {
+    test('should throw error when registering duplicate device', () => {
       registry.registerDevice('sensor1', 'Sensor 1', DeviceType.SENSOR);
-      expect(() => registry.registerDevice('sensor1', 'Duplicado', DeviceType.SENSOR)).toThrow(EnergyManagerError);
+      expect(() => registry.registerDevice('sensor1', 'Duplicate', DeviceType.SENSOR)).toThrow(EnergyManagerError);
     });
 
-    test('deve lançar erro com configuração inválida', () => {
-      // Testar intervalos de relatório inválidos
+    test('should throw error with invalid configuration', () => {
+      // Test invalid reporting intervals
       expect(() => registry.registerDevice(
         'sensor1',
         'Sensor 1',
         DeviceType.SENSOR,
-        { reportingInterval: 0 } // Valor inválido
+        { reportingInterval: 0 } // Invalid value
       )).toThrow(EnergyManagerError);
 
       expect(() => registry.registerDevice(
         'sensor1',
         'Sensor 1',
         DeviceType.SENSOR,
-        { sleepThreshold: 101 } // Valor inválido
+        { sleepThreshold: 101 } // Invalid value
       )).toThrow(EnergyManagerError);
     });
   });
 
-  describe('Gerenciamento de Grupos', () => {
-    test('deve lançar erro ao usar nome de grupo inválido', () => {
+  describe('Group Management', () => {
+    test('should throw error when using invalid group name', () => {
       expect(() => registry.createGroup('')).toThrow(EnergyManagerError);
-      expect(() => registry.createGroup('grupo@especial')).toThrow(EnergyManagerError);
+      expect(() => registry.createGroup('group@special')).toThrow(EnergyManagerError);
     });
 
-    test('deve lançar erro ao acessar grupo inexistente', () => {
-      expect(() => registry.getDevicesInGroup('grupo-inexistente')).toThrow(EnergyManagerError);
-      expect(() => registry.getDeviceIdsInGroup('grupo-inexistente')).toThrow(EnergyManagerError);
+    test('should throw error when accessing non-existent group', () => {
+      expect(() => registry.getDevicesInGroup('non-existent-group')).toThrow(EnergyManagerError);
+      expect(() => registry.getDeviceIdsInGroup('non-existent-group')).toThrow(EnergyManagerError);
     });
 
-    test('deve lançar erro ao remover dispositivo de grupo inexistente', () => {
+    test('should throw error when removing device from non-existent group', () => {
       registry.registerDevice('sensor1', 'Sensor 1', DeviceType.SENSOR);
-      expect(() => registry.removeDeviceFromGroup('sensor1', 'grupo-inexistente')).toThrow(EnergyManagerError);
+      expect(() => registry.removeDeviceFromGroup('sensor1', 'non-existent-group')).toThrow(EnergyManagerError);
     });
   });
 });

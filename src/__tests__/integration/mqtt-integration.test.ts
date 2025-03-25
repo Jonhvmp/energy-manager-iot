@@ -1,15 +1,24 @@
 import { EnergyManager, DeviceType, PowerMode, ConnectionStatus, CommandType } from '../../index';
 import * as mqtt from 'mqtt';
 
-// Este teste requer um broker MQTT local rodando na porta 1883
-// Pule se não estiver disponível
+/**
+ * Integration tests for MQTT communication
+ *
+ * These tests require a local MQTT broker running on port 1883.
+ * Tests will be skipped if the broker is not available.
+ *
+ * @group integration
+ */
+
+// This test requires a local MQTT broker running on port 1883
+// Skip if not available
 const localBrokerAvailable = async (): Promise<boolean> => {
   let client: mqtt.MqttClient | undefined = undefined;
   let timeoutHandle: NodeJS.Timeout | null = null;
 
   try {
     return new Promise<boolean>((resolve) => {
-      // Criar timeout para evitar que o teste fique preso aguardando conexão
+      // Create timeout to avoid test hanging waiting for connection
       timeoutHandle = setTimeout(() => {
         if (client) {
           client.removeAllListeners();
@@ -19,7 +28,7 @@ const localBrokerAvailable = async (): Promise<boolean> => {
         }
       }, 1000);
 
-      // Tentar conectar
+      // Try to connect
       client = mqtt.connect('mqtt://localhost:1883', {
         connectTimeout: 1000,
         reconnectPeriod: 0
@@ -39,8 +48,8 @@ const localBrokerAvailable = async (): Promise<boolean> => {
   } catch (e) {
     if (timeoutHandle) clearTimeout(timeoutHandle);
 
-    // Corrigir o erro de tipagem usando verificação de tipo explícita
-    // e um operador de não-nulidade para garantir que TypeScript reconheça client
+    // Fix type error using explicit type check
+    // and a non-null assertion to ensure TypeScript recognizes client
     if (client!) {
       const mqttClient = client as mqtt.MqttClient;
       mqttClient.removeAllListeners();
@@ -51,20 +60,20 @@ const localBrokerAvailable = async (): Promise<boolean> => {
   }
 };
 
-describe('Integração MQTT', () => {
+describe('MQTT Integration', () => {
   let energyManager: EnergyManager;
   let testClient: mqtt.MqttClient;
   let brokerAvailable = false;
 
-  // Verificar se o broker está disponível antes dos testes
+  // Check if broker is available before tests
   beforeAll(async () => {
     try {
       brokerAvailable = await localBrokerAvailable();
       if (!brokerAvailable) {
-        console.warn('Broker MQTT local não disponível. Testes de integração serão ignorados.');
+        console.warn('Local MQTT broker not available. Integration tests will be skipped.');
       }
     } catch (error) {
-      console.error('Erro ao verificar disponibilidade do broker:', error);
+      console.error('Error checking broker availability:', error);
       brokerAvailable = false;
     }
   });
@@ -73,20 +82,20 @@ describe('Integração MQTT', () => {
     if (!brokerAvailable) {
       return;
     }
-    // Criar instância do gerenciador
+    // Create manager instance
     energyManager = new EnergyManager({
       topicPrefix: 'test/devices/'
     });
 
-    // Conectar ao broker
+    // Connect to broker
     await energyManager.connect('mqtt://localhost:1883');
 
-    // Cliente de teste para simular dispositivos
+    // Test client to simulate devices
     testClient = mqtt.connect('mqtt://localhost:1883', {
       clientId: `test-client-${Date.now()}`
     });
 
-    // Aguardar conexão do cliente de teste
+    // Wait for test client to connect
     await new Promise<void>((resolve) => {
       testClient.on('connect', () => resolve());
     });
@@ -96,7 +105,7 @@ describe('Integração MQTT', () => {
     if (!brokerAvailable) {
       return;
     }
-    // Limpar recursos
+    // Clean up resources
     if (energyManager) {
       await energyManager.disconnect();
     }
@@ -107,15 +116,15 @@ describe('Integração MQTT', () => {
     }
   });
 
-  test('deve atualizar status ao receber mensagem do dispositivo', async () => {
+  test('should update status when receiving message from device', async () => {
     if (!brokerAvailable) {
       return;
     }
 
-    // Registrar dispositivo
+    // Register device
     energyManager.registerDevice('sensor1', 'Test Sensor', DeviceType.SENSOR);
 
-    // Configurar listener de status
+    // Set up status listener
     const statusUpdatePromise = new Promise<void>((resolve) => {
       energyManager.on('statusUpdate', (deviceId, status) => {
         if (deviceId === 'sensor1' && status.batteryLevel === 85) {
@@ -124,36 +133,36 @@ describe('Integração MQTT', () => {
       });
     });
 
-    // Publicar mensagem de status simulando o dispositivo
+    // Publish status message simulating the device
     testClient.publish('test/devices/sensor1/status', JSON.stringify({
       batteryLevel: 85,
       powerMode: PowerMode.NORMAL,
       connectionStatus: ConnectionStatus.ONLINE
     }));
 
-    // Aguardar atualização de status
+    // Wait for status update
     await statusUpdatePromise;
 
-    // Verificar se o status foi atualizado
+    // Verify status was updated
     const device = energyManager.getDevice('sensor1');
     expect(device.status).toBeDefined();
     expect(device.status?.batteryLevel).toBe(85);
     expect(device.status?.powerMode).toBe(PowerMode.NORMAL);
-  }, 5000); // Timeout de 5 segundos
+  }, 5000); // 5 second timeout
 
-  test('deve enviar comando para o dispositivo', async () => {
+  test('should send command to device', async () => {
     if (!brokerAvailable) {
       return;
     }
 
-    // Registrar dispositivo
+    // Register device
     energyManager.registerDevice('sensor1', 'Test Sensor', DeviceType.SENSOR);
 
-    // Promessa para verificar recebimento do comando
+    // Promise to verify command reception
     const commandReceivedPromise = new Promise<any>((resolve) => {
       testClient.subscribe('test/devices/sensor1/command', (err) => {
         if (err) {
-          console.error('Erro ao assinar tópico de comando:', err);
+          console.error('Error subscribing to command topic:', err);
         }
       });
 
@@ -163,22 +172,22 @@ describe('Integração MQTT', () => {
             const command = JSON.parse(message.toString());
             resolve(command);
           } catch (e) {
-            console.error('Erro ao analisar comando:', e);
+            console.error('Error parsing command:', e);
           }
         }
       });
     });
 
-    // Corrigido: Usando o enum CommandType em vez da string literal
+    // Fixed: Using CommandType enum instead of string literal
     await energyManager.sendCommand('sensor1', CommandType.SLEEP, { duration: 300 });
 
-    // Aguardar recebimento do comando
+    // Wait for command reception
     const command = await commandReceivedPromise;
 
-    // Verificar comando
+    // Verify command
     expect(command).toBeDefined();
     expect(command.type).toBe(CommandType.SLEEP);
     expect(command.payload).toEqual({ duration: 300 });
     expect(command.requestId).toBeDefined();
-  }, 5000); // Timeout de 5 segundos
+  }, 5000); // 5 second timeout
 });

@@ -7,7 +7,13 @@ jest.mock('mqtt', () => {
   // ... (similar to mqtt-handler.test.ts)
 });
 
-describe('EnergyManager - Funcionalidades Avançadas', () => {
+/**
+ * Tests for advanced functionality of the EnergyManager class
+ *
+ * These tests cover edge cases and more complex scenarios like offline detection,
+ * status processing, and error handling in commands.
+ */
+describe('EnergyManager - Advanced Features', () => {
   let energyManager: EnergyManager;
 
   beforeEach(() => {
@@ -25,61 +31,61 @@ describe('EnergyManager - Funcionalidades Avançadas', () => {
     energyManager.removeAllListeners();
   });
 
-  describe('Manipulação de Status', () => {
-    test('deve detectar dispositivos offline após intervalo', () => {
-      // Registrar dispositivo
+  describe('Status Handling', () => {
+    test('should detect offline devices after interval', () => {
+      // Register device
       energyManager.registerDevice('sensor1', 'Sensor', DeviceType.SENSOR);
 
-      // Simular conexão MQTT
+      // Simulate MQTT connection
       Object.defineProperty(energyManager['mqtt'], 'isClientConnected', {
         value: () => true
       });
 
-      // Simular status inicial (online)
+      // Simulate initial status (online)
       const now = Date.now();
       const offlineListener = jest.fn();
       energyManager.on('deviceOffline', offlineListener);
 
-      // @ts-ignore - Acessar método privado para teste
+      // @ts-ignore - Access private method for testing
       energyManager.registry.updateDeviceStatus('sensor1', {
         deviceId: 'sensor1',
         batteryLevel: 80,
         powerMode: PowerMode.NORMAL,
         connectionStatus: ConnectionStatus.ONLINE,
-        lastSeen: now - 3000 // 3 segundos atrás (mais que 2x o intervalo de 1000ms)
+        lastSeen: now - 3000 // 3 seconds ago (more than 2x the 1000ms interval)
       });
 
-      // Acionar verificação de status
-      // @ts-ignore - Acessar método privado para teste
+      // Trigger status check
+      // @ts-ignore - Access private method for testing
       energyManager['checkDevicesStatus']();
 
-      // Verificar se o dispositivo foi marcado como offline
+      // Verify device was marked as offline
       expect(offlineListener).toHaveBeenCalledWith('sensor1');
 
-      // Verificar novo status
+      // Verify new status
       const device = energyManager.getDevice('sensor1');
       expect(device.status?.connectionStatus).toBe(ConnectionStatus.OFFLINE);
     });
 
-    test('deve processar mensagens de status recebidas', () => {
-      // Registrar dispositivo
+    test('should process received status messages', () => {
+      // Register device
       energyManager.registerDevice('sensor1', 'Sensor', DeviceType.SENSOR);
 
-      // Configurar listener
+      // Set up listener
       const statusUpdateListener = jest.fn();
       energyManager.on('statusUpdate', statusUpdateListener);
 
-      // Simular recebimento de mensagem de status
+      // Simulate receiving status message
       const statusMessage = JSON.stringify({
         batteryLevel: 75,
         powerMode: PowerMode.LOW_POWER,
         connectionStatus: ConnectionStatus.ONLINE
       });
 
-      // @ts-ignore - Acessar método privado para teste
+      // @ts-ignore - Access private method for testing
       energyManager['handleIncomingMessage']('test/devices/sensor1/status', Buffer.from(statusMessage));
 
-      // Verificar se o evento foi emitido
+      // Verify event was emitted
       expect(statusUpdateListener).toHaveBeenCalledWith('sensor1', expect.objectContaining({
         batteryLevel: 75,
         powerMode: PowerMode.LOW_POWER,
@@ -87,73 +93,73 @@ describe('EnergyManager - Funcionalidades Avançadas', () => {
       }));
     });
 
-    test('deve lidar com mensagens de status inválidas', () => {
-      // Registrar dispositivo
+    test('should handle invalid status messages', () => {
+      // Register device
       energyManager.registerDevice('sensor1', 'Sensor', DeviceType.SENSOR);
 
-      // Configurar listener
+      // Set up listener
       const statusUpdateListener = jest.fn();
       energyManager.on('statusUpdate', statusUpdateListener);
 
-      // Simular recebimento de mensagem inválida
-      // @ts-ignore - Acessar método privado para teste
+      // Simulate receiving invalid message
+      // @ts-ignore - Access private method for testing
       energyManager['handleIncomingMessage']('test/devices/sensor1/status', Buffer.from('invalid json'));
 
-      // Não deve emitir evento de atualização
+      // Should not emit update event
       expect(statusUpdateListener).not.toHaveBeenCalled();
     });
   });
 
-  describe('Comandos Avançados', () => {
-    test('deve lançar erro ao enviar comando com MQTT desconectado', async () => {
-      // Registrar dispositivo
+  describe('Advanced Commands', () => {
+    test('should throw error when sending command with MQTT disconnected', async () => {
+      // Register device
       energyManager.registerDevice('sensor1', 'Sensor', DeviceType.SENSOR);
 
-      // Tentar enviar comando sem conectar
+      // Try to send command without connecting
       await expect(
         energyManager.sendCommand('sensor1', CommandType.SLEEP)
       ).rejects.toThrow(EnergyManagerError);
     });
 
-    test('deve enviar comando para grupo vazio sem erro', async () => {
-      // Criar grupo vazio
+    test('should send command to empty group without error', async () => {
+      // Create empty group
       energyManager.createGroup('empty-group');
 
-      // Simular conexão
+      // Simulate connection
       Object.defineProperty(energyManager['mqtt'], 'isClientConnected', {
         value: () => true
       });
 
-      // Enviar comando para grupo vazio
+      // Send command to empty group
       await energyManager.sendCommandToGroup('empty-group', CommandType.WAKE);
 
-      // Nenhum erro deve ser lançado
+      // No error should be thrown
     });
   });
 
-  describe('Métodos de Conveniência', () => {
+  describe('Convenience Methods', () => {
     beforeEach(() => {
-      // Mockear sendCommand para testes
+      // Mock sendCommand for tests
       energyManager.sendCommand = jest.fn().mockResolvedValue(undefined);
       energyManager.sendCommandToGroup = jest.fn().mockResolvedValue(undefined);
     });
 
-    test('deve chamar sendCommand com parâmetros corretos ao usar sleepDevice', async () => {
+    test('should call sendCommand with correct parameters when using sleepDevice', async () => {
       await energyManager.sleepDevice('sensor1', 3600);
       expect(energyManager.sendCommand).toHaveBeenCalledWith('sensor1', CommandType.SLEEP, { duration: 3600 });
     });
 
-    test('deve chamar sendCommand com parâmetros corretos ao usar wakeDevice', async () => {
+    test('should call sendCommand with correct parameters when using wakeDevice', async () => {
       await energyManager.wakeDevice('sensor1');
       expect(energyManager.sendCommand).toHaveBeenCalledWith('sensor1', CommandType.WAKE);
     });
 
-    test('deve chamar sendCommandToGroup com parâmetros corretos ao usar sleepGroup', async () => {
+    test('should call sendCommandToGroup with correct parameters when using sleepGroup', async () => {
       await energyManager.sleepGroup('bedroom', 3600);
       expect(energyManager.sendCommandToGroup).toHaveBeenCalledWith('bedroom', CommandType.SLEEP, { duration: 3600 });
     });
 
-    test('deve chamar sendCommandToGroup com parâmetros corretos ao usar wakeGroup', async () => {
+    test('should call sendCommandToGroup with correct parameters when using wakeGroup', async () => {
       await energyManager.wakeGroup('bedroom');
       expect(energyManager.sendCommandToGroup).toHaveBeenCalledWith('bedroom', CommandType.WAKE);
     });

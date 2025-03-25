@@ -2,7 +2,7 @@ import { EnergyManager, DeviceType, CommandType, PowerMode, ConnectionStatus } f
 import { EnergyManagerError } from '../utils/error-handler';
 import * as mqtt from 'mqtt';
 
-// Defina o tipo para chamadas de mock
+// Define type for mock calls
 type MockCall = [string, Function];
 
 jest.mock('mqtt', () => {
@@ -20,7 +20,13 @@ jest.mock('mqtt', () => {
   };
 });
 
-describe('EnergyManager - Cobertura Avançada', () => {
+/**
+ * Advanced coverage tests for the EnergyManager class
+ *
+ * These tests focus on improving code coverage by testing specific
+ * behaviors and edge cases not covered by the main test suite.
+ */
+describe('EnergyManager - Advanced Coverage', () => {
   let energyManager: EnergyManager;
   let mockMqttClient: any;
 
@@ -40,33 +46,33 @@ describe('EnergyManager - Cobertura Avançada', () => {
     energyManager.removeAllListeners();
   });
 
-  describe('Tópicos e IDs', () => {
-    test('deve extrair corretamente ID de dispositivo do tópico', () => {
-      // @ts-ignore - Acessar método privado
+  describe('Topics and IDs', () => {
+    test('should correctly extract device ID from topic', () => {
+      // @ts-ignore - Access private method
       const deviceId = energyManager['extractDeviceIdFromStatusTopic']('advanced/test/sensor123/status');
       expect(deviceId).toBe('sensor123');
     });
 
-    test('deve retornar null para tópicos inválidos', () => {
-      // @ts-ignore - Acessar método privado
+    test('should return null for invalid topics', () => {
+      // @ts-ignore - Access private method
       const deviceId1 = energyManager['extractDeviceIdFromStatusTopic']('wrong-prefix/sensor123/status');
-      // @ts-ignore - Acessar método privado
+      // @ts-ignore - Access private method
       const deviceId2 = energyManager['extractDeviceIdFromStatusTopic']('advanced/test/sensor123/command');
 
       expect(deviceId1).toBeNull();
       expect(deviceId2).toBeNull();
     });
 
-    test('deve gerar ID de solicitação único', () => {
-      // @ts-ignore - Acessar método privado
+    test('should generate unique request IDs', () => {
+      // @ts-ignore - Access private method
       const requestId = energyManager['generateRequestId']();
       expect(requestId).toMatch(/^req_\d+_[a-z0-9]+$/);
     });
   });
 
-  describe('Erros em Comandos', () => {
-    test('deve lançar erro ao enviar comando para dispositivo inexistente', async () => {
-      // Simular conexão MQTT
+  describe('Command Errors', () => {
+    test('should throw error when sending command to non-existent device', async () => {
+      // Simulate MQTT connection
       Object.defineProperty(energyManager['mqtt'], 'isClientConnected', {
         value: () => true
       });
@@ -76,16 +82,16 @@ describe('EnergyManager - Cobertura Avançada', () => {
       ).rejects.toThrow(EnergyManagerError);
     });
 
-    test('deve tratar erro ao publicar comando', async () => {
-      // Registrar dispositivo
+    test('should handle error when publishing command', async () => {
+      // Register device
       energyManager.registerDevice('sensor1', 'Sensor', DeviceType.SENSOR);
 
-      // Simular conexão MQTT
+      // Simulate MQTT connection
       Object.defineProperty(energyManager['mqtt'], 'isClientConnected', {
         value: () => true
       });
 
-      // Simular erro de publicação
+      // Simulate publish error
       energyManager['mqtt'].publish = jest.fn().mockRejectedValue(
         new Error('Publish failed')
       );
@@ -95,18 +101,18 @@ describe('EnergyManager - Cobertura Avançada', () => {
       ).rejects.toThrow();
     });
 
-    test('deve propagar erro ao enviar comando para grupo', async () => {
-      // Criar grupo e adicionar dispositivo
+    test('should propagate error when sending command to group', async () => {
+      // Create group and add device
       energyManager.createGroup('test-group');
       energyManager.registerDevice('sensor1', 'Sensor', DeviceType.SENSOR);
       energyManager.addDeviceToGroup('sensor1', 'test-group');
 
-      // Simular conexão MQTT
+      // Simulate MQTT connection
       Object.defineProperty(energyManager['mqtt'], 'isClientConnected', {
         value: () => true
       });
 
-      // Simular erro no envio de comando
+      // Simulate command error
       energyManager.sendCommand = jest.fn().mockRejectedValue(
         new Error('Command failed')
       );
@@ -117,36 +123,36 @@ describe('EnergyManager - Cobertura Avançada', () => {
     });
   });
 
-  describe('Eventos do MQTT', () => {
+  describe('MQTT Events', () => {
     beforeEach(() => {
-      // Simular conexão MQTT para testar eventos
+      // Simulate MQTT connection to test events
       const connectPromise = energyManager.connect('mqtt://localhost:1883');
 
-      // Simular callback de conexão
+      // Simulate connect callback
       const onConnect = mockMqttClient.on.mock.calls.find((c: MockCall) => c[0] === 'connect')?.[1];
       if (onConnect) onConnect();
 
       return connectPromise;
     });
 
-    test('deve emitir evento de reconexão', () => {
+    test('should emit reconnect event', () => {
       const reconnectListener = jest.fn();
       energyManager.on('reconnecting', reconnectListener);
 
-      // Simular evento de reconexão
+      // Simulate reconnect event
       const onReconnect = mockMqttClient.on.mock.calls.find((c: MockCall) => c[0] === 'reconnect')?.[1];
       if (onReconnect) onReconnect();
 
       expect(reconnectListener).toHaveBeenCalled();
     });
 
-    test('deve emitir evento de erro', () => {
+    test('should emit error event', () => {
       const errorListener = jest.fn();
       energyManager.on('error', errorListener);
 
       const testError = new Error('Test error');
 
-      // Simular evento de erro
+      // Simulate error event
       const onError = mockMqttClient.on.mock.calls.find((c: MockCall) => c[0] === 'error')?.[1];
       if (onError) onError(testError);
 
@@ -154,47 +160,47 @@ describe('EnergyManager - Cobertura Avançada', () => {
     });
   });
 
-  describe('Assinatura de tópicos', () => {
-    test('deve assinar tópicos de todos os dispositivos', async () => {
-      // Registrar dispositivos
+  describe('Topic Subscriptions', () => {
+    test('should subscribe to all device status topics', async () => {
+      // Register devices
       energyManager.registerDevice('sensor1', 'Sensor 1', DeviceType.SENSOR);
       energyManager.registerDevice('sensor2', 'Sensor 2', DeviceType.SENSOR);
 
-      // Espiar método de assinatura
+      // Spy on subscribe method
       const subscribeSpy = jest.spyOn(energyManager['mqtt'], 'subscribe')
         .mockResolvedValue();
 
-      // Simular estado conectado
+      // Simulate connected state
       Object.defineProperty(energyManager['mqtt'], 'isClientConnected', {
         value: () => true
       });
 
-      // @ts-ignore - Acessar método privado
+      // @ts-ignore - Access private method
       await energyManager['subscribeToAllDeviceStatuses']();
 
-      // Deve chamar subscribe para cada dispositivo
+      // Should call subscribe for each device
       expect(subscribeSpy).toHaveBeenCalledTimes(2);
       expect(subscribeSpy).toHaveBeenCalledWith('advanced/test/sensor1/status');
       expect(subscribeSpy).toHaveBeenCalledWith('advanced/test/sensor2/status');
     });
 
-    test('não deve tentar assinar quando desconectado', async () => {
-      // Registrar dispositivo
+    test('should not attempt to subscribe when disconnected', async () => {
+      // Register device
       energyManager.registerDevice('sensor1', 'Sensor', DeviceType.SENSOR);
 
-      // Espiar método de assinatura
+      // Spy on subscribe method
       const subscribeSpy = jest.spyOn(energyManager['mqtt'], 'subscribe')
         .mockResolvedValue();
 
-      // Simular estado desconectado
+      // Simulate disconnected state
       Object.defineProperty(energyManager['mqtt'], 'isClientConnected', {
         value: () => false
       });
 
-      // @ts-ignore - Acessar método privado
+      // @ts-ignore - Access private method
       await energyManager['subscribeToAllDeviceStatuses']();
 
-      // Não deve chamar subscribe
+      // Should not call subscribe
       expect(subscribeSpy).not.toHaveBeenCalled();
     });
   });

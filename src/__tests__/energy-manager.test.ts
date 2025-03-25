@@ -1,7 +1,14 @@
 import { EnergyManager, DeviceType, CommandType, PowerMode, ConnectionStatus } from '../index';
 import * as mqtt from 'mqtt';
 
-// Mock do cliente MQTT
+/**
+ * Main tests for the EnergyManager class
+ *
+ * This test suite covers the core functionality of the EnergyManager,
+ * including device management, group operations, and MQTT communication.
+ */
+
+// Mock MQTT client
 jest.mock('mqtt', () => {
   const mockClient = {
     on: jest.fn(),
@@ -30,52 +37,52 @@ describe('EnergyManager', () => {
     mockMqttClient = mqtt.connect('mqtt://localhost:1883');
   });
 
-  // Limpar recursos após cada teste
+  // Clean up resources after each test
   afterEach(async () => {
-    // Parar verificação de status
+    // Stop status check
     if (energyManager['statusCheckInterval']) {
       clearInterval(energyManager['statusCheckInterval']);
       energyManager['statusCheckInterval'] = undefined;
     }
 
-    // Remover todos os listeners para evitar memory leaks
+    // Remove all listeners to prevent memory leaks
     energyManager.removeAllListeners();
 
-    // Certificar-se de que o cliente MQTT foi encerrado
+    // Ensure MQTT client was terminated
     if (mockMqttClient.removeAllListeners) {
       mockMqttClient.removeAllListeners();
     }
   });
 
-  // Limpar todos os recursos após todos os testes
+  // Clean up all resources after all tests
   afterAll(() => {
     jest.restoreAllMocks();
   });
 
-  describe('Inicialização', () => {
-    test('deve criar instância com propriedades padrão', () => {
+  describe('Initialization', () => {
+    test('should create instance with default properties', () => {
       expect(energyManager).toBeDefined();
       expect(energyManager.isConnected()).toBe(false);
     });
 
-    test('deve usar prefixo de tópico personalizado', () => {
+    test('should use custom topic prefix', () => {
       energyManager.setTopicPrefix('custom/prefix/');
 
-      // Registrar um dispositivo para testar o prefixo
+      // Register a device to test the prefix
       energyManager.registerDevice('test-device', 'Test Device', DeviceType.SENSOR);
 
-      // Simular conexão
+      // Simulate connection
       Object.defineProperty(energyManager, 'mqtt', {
         value: { isClientConnected: () => true }
       });
 
-      // Verificar se o prefixo é usado
+      // Verify prefix is used
       expect(energyManager['topicPrefix']).toBe('custom/prefix/');
     });
   });
 
-  describe('Gerenciamento de Dispositivos', () => {
-    test('deve registrar e recuperar dispositivos', () => {
+  describe('Device Management', () => {
+    test('should register and retrieve devices', () => {
       const device = energyManager.registerDevice(
         'sensor1',
         'Temperature Sensor',
@@ -93,7 +100,7 @@ describe('EnergyManager', () => {
       expect(retrievedDevice).toEqual(device);
     });
 
-    test('deve atualizar dispositivos', () => {
+    test('should update devices', () => {
       energyManager.registerDevice('sensor1', 'Temperature Sensor', DeviceType.SENSOR);
 
       const updatedDevice = energyManager.updateDevice('sensor1', {
@@ -105,24 +112,24 @@ describe('EnergyManager', () => {
       expect(updatedDevice.config.reportingInterval).toBe(120);
     });
 
-    test('deve remover dispositivos', () => {
+    test('should remove devices', () => {
       energyManager.registerDevice('sensor1', 'Temperature Sensor', DeviceType.SENSOR);
 
       const removed = energyManager.removeDevice('sensor1');
       expect(removed).toBe(true);
 
-      // Verificar se o dispositivo não existe mais
+      // Verify device no longer exists
       expect(() => energyManager.getDevice('sensor1')).toThrow();
     });
   });
 
-  describe('Gerenciamento de Grupos', () => {
+  describe('Group Management', () => {
     beforeEach(() => {
       energyManager.registerDevice('sensor1', 'Temperature Sensor', DeviceType.SENSOR);
       energyManager.registerDevice('sensor2', 'Humidity Sensor', DeviceType.SENSOR);
     });
 
-    test('deve criar grupos', () => {
+    test('should create groups', () => {
       const created = energyManager.createGroup('bedroom');
       expect(created).toBe(true);
 
@@ -130,7 +137,7 @@ describe('EnergyManager', () => {
       expect(groups).toContain('bedroom');
     });
 
-    test('deve adicionar dispositivos a grupos', () => {
+    test('should add devices to groups', () => {
       energyManager.createGroup('bedroom');
       const added = energyManager.addDeviceToGroup('sensor1', 'bedroom');
 
@@ -140,12 +147,12 @@ describe('EnergyManager', () => {
       expect(devices.length).toBe(1);
       expect(devices[0].id).toBe('sensor1');
 
-      // Verificar se o grupo está no dispositivo
+      // Verify group is in device
       const device = energyManager.getDevice('sensor1');
       expect(device.groups).toContain('bedroom');
     });
 
-    test('deve remover dispositivos de grupos', () => {
+    test('should remove devices from groups', () => {
       energyManager.createGroup('bedroom');
       energyManager.addDeviceToGroup('sensor1', 'bedroom');
 
@@ -155,17 +162,17 @@ describe('EnergyManager', () => {
       const devices = energyManager.getDevicesInGroup('bedroom');
       expect(devices.length).toBe(0);
 
-      // Verificar se o grupo foi removido do dispositivo
+      // Verify group was removed from device
       const device = energyManager.getDevice('sensor1');
       expect(device.groups).not.toContain('bedroom');
     });
 
-    test('deve calcular estatísticas de grupo', () => {
-      // Adicionar status simulado aos dispositivos
+    test('should calculate group statistics', () => {
+      // Add simulated status to devices
       const device1 = energyManager.getDevice('sensor1');
       const device2 = energyManager.getDevice('sensor2');
 
-      // @ts-ignore - Acessando método privado para teste
+      // @ts-ignore - Accessing private method for test
       energyManager.registry.updateDeviceStatus('sensor1', {
         deviceId: 'sensor1',
         batteryLevel: 80,
@@ -174,7 +181,7 @@ describe('EnergyManager', () => {
         lastSeen: Date.now()
       });
 
-      // @ts-ignore - Acessando método privado para teste
+      // @ts-ignore - Accessing private method for test
       energyManager.registry.updateDeviceStatus('sensor2', {
         deviceId: 'sensor2',
         batteryLevel: 60,
@@ -183,15 +190,15 @@ describe('EnergyManager', () => {
         lastSeen: Date.now()
       });
 
-      // Criar grupo com os dois sensores
+      // Create group with both sensors
       energyManager.createGroup('sensors');
       energyManager.addDeviceToGroup('sensor1', 'sensors');
       energyManager.addDeviceToGroup('sensor2', 'sensors');
 
-      // Calcular estatísticas
+      // Calculate statistics
       const stats = energyManager.getGroupStatistics('sensors');
 
-      // Verificar estatísticas
+      // Verify statistics
       expect(stats.totalDevices).toBe(2);
       expect(stats.averageBatteryLevel).toBe(70); // (80 + 60) / 2
       expect(stats.onlineCount).toBe(2);
@@ -200,25 +207,25 @@ describe('EnergyManager', () => {
     });
   });
 
-  // Simulação básica de conexão MQTT
-  describe('Conexão MQTT', () => {
-    test('deve conectar ao broker MQTT', async () => {
-      // Configurar mock de eventos
+  // Basic MQTT connection simulation
+  describe('MQTT Connection', () => {
+    test('should connect to MQTT broker', async () => {
+      // Set up mock events
       let connectCallback: Function | undefined;
       mockMqttClient.on.mockImplementation((event: string, callback: Function) => {
         if (event === 'connect') {
           connectCallback = callback;
         }
-        return mockMqttClient; // Retornar o cliente para permitir encadeamento
+        return mockMqttClient; // Return client to allow chaining
       });
 
-      // Iniciar conexão
+      // Start connection
       const connectPromise = energyManager.connect('mqtt://localhost');
 
-      // Garantir que o callback foi definido
+      // Ensure callback was defined
       expect(connectCallback).toBeDefined();
 
-      // Simular evento de conexão bem-sucedida
+      // Simulate successful connect event
       if (connectCallback) {
         connectCallback();
       }
@@ -228,12 +235,12 @@ describe('EnergyManager', () => {
       expect(mqtt.connect).toHaveBeenCalledWith('mqtt://localhost', expect.any(Object));
     });
 
-    // Novo teste para desconexão
-    test('deve desconectar do broker MQTT', async () => {
-      // Simular estado conectado
+    // New test for disconnection
+    test('should disconnect from MQTT broker', async () => {
+      // Simulate connected state
       Object.defineProperty(energyManager['mqtt'], 'isConnected', { value: true });
 
-      // Espiar o método disconnect do MQTT handler
+      // Spy on MQTT handler's disconnect method
       const disconnectSpy = jest.spyOn(energyManager['mqtt'], 'disconnect')
         .mockResolvedValue();
 

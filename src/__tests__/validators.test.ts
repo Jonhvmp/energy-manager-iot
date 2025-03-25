@@ -1,4 +1,4 @@
-// Garantir que o mock do MQTT seja aplicado antes de importar os validadores
+// Ensure MQTT mock is applied before importing validators
 import {
   validateDeviceId,
   validateGroupName,
@@ -8,59 +8,66 @@ import {
 } from '../utils/validators';
 import { CommandType } from '../types/command';
 
-// Garantir que o módulo MQTT está mockado
+/**
+ * Tests for validator utility functions
+ *
+ * This test suite verifies that the validator functions correctly
+ * identify valid and invalid input values according to system requirements.
+ */
+
+// Ensure MQTT module is mocked
 jest.mock('mqtt');
 
-describe('Validadores', () => {
+describe('Validators', () => {
   describe('validateDeviceId', () => {
-    test('deve aceitar IDs válidos', () => {
+    test('should accept valid IDs', () => {
       expect(validateDeviceId('sensor1')).toBe(true);
       expect(validateDeviceId('DEVICE_123')).toBe(true);
       expect(validateDeviceId('temp-sensor-01')).toBe(true);
-      expect(validateDeviceId('a'.repeat(50))).toBe(true); // 50 caracteres
+      expect(validateDeviceId('a'.repeat(50))).toBe(true); // 50 characters
     });
 
-    test('deve rejeitar IDs inválidos', () => {
-      expect(validateDeviceId('')).toBe(false); // Vazio
-      expect(validateDeviceId('ab')).toBe(false); // Muito curto
-      expect(validateDeviceId('device@123')).toBe(false); // Caracteres especiais
-      expect(validateDeviceId('a'.repeat(51))).toBe(false); // Muito longo
+    test('should reject invalid IDs', () => {
+      expect(validateDeviceId('')).toBe(false); // Empty
+      expect(validateDeviceId('ab')).toBe(false); // Too short
+      expect(validateDeviceId('device@123')).toBe(false); // Special characters
+      expect(validateDeviceId('a'.repeat(51))). toBe(false); // Too long
     });
   });
 
   describe('validateGroupName', () => {
-    test('deve aceitar nomes de grupo válidos', () => {
+    test('should accept valid group names', () => {
       expect(validateGroupName('living-room')).toBe(true);
       expect(validateGroupName('Room 1')).toBe(true);
-      expect(validateGroupName('ab')).toBe(true); // 2 caracteres
-      expect(validateGroupName('a'.repeat(50))).toBe(true); // 50 caracteres
+      expect(validateGroupName('ab')).toBe(true); // 2 characters
+      expect(validateGroupName('a'.repeat(50))).toBe(true); // 50 characters
     });
 
-    test('deve rejeitar nomes de grupo inválidos', () => {
-      expect(validateGroupName('')).toBe(false); // Vazio
-      expect(validateGroupName('a')).toBe(false); // Muito curto
-      expect(validateGroupName('room@home')).toBe(false); // Caracteres especiais
-      expect(validateGroupName('a'.repeat(51))).toBe(false); // Muito longo
+    test('should reject invalid group names', () => {
+      expect(validateGroupName('')).toBe(false); // Empty
+      expect(validateGroupName('a')).toBe(false); // Too short
+      expect(validateGroupName('room@home')).toBe(false); // Special characters
+      expect(validateGroupName('a'.repeat(51))).toBe(false); // Too long
     });
   });
 
   describe('validateMqttBrokerUrl', () => {
-    test('deve aceitar URLs de broker válidas', () => {
+    test('should accept valid broker URLs', () => {
       expect(validateMqttBrokerUrl('mqtt://localhost')).toBe(true);
       expect(validateMqttBrokerUrl('mqtt://localhost:1883')).toBe(true);
       expect(validateMqttBrokerUrl('mqtts://broker.example.com:8883')).toBe(true);
     });
 
-    test('deve rejeitar URLs de broker inválidas', () => {
+    test('should reject invalid broker URLs', () => {
       expect(validateMqttBrokerUrl('')).toBe(false);
-      expect(validateMqttBrokerUrl('http://localhost')).toBe(false); // Protocolo errado
-      expect(validateMqttBrokerUrl('mqtt://')).toBe(false); // Sem host
-      expect(validateMqttBrokerUrl('mqtt://@:1883')).toBe(false); // Formato inválido
+      expect(validateMqttBrokerUrl('http://localhost')).toBe(false); // Wrong protocol
+      expect(validateMqttBrokerUrl('mqtt://')).toBe(false); // No host
+      expect(validateMqttBrokerUrl('mqtt://@:1883')).toBe(false); // Invalid format
     });
   });
 
   describe('validateCommand', () => {
-    test('deve aceitar comandos válidos', () => {
+    test('should accept valid commands', () => {
       expect(validateCommand({
         type: CommandType.SLEEP,
         timestamp: Date.now()
@@ -73,22 +80,22 @@ describe('Validadores', () => {
       })).toBe(true);
     });
 
-    test('deve rejeitar comandos inválidos', () => {
-      // Tipo inválido
+    test('should reject invalid commands', () => {
+      // Invalid type
       expect(validateCommand({
-        // @ts-ignore - Testando propositalmente com tipo inválido
+        // @ts-ignore - Intentionally testing with invalid type
         type: 'invalid_command',
         timestamp: Date.now()
       })).toBe(false);
 
-      // Sem timestamp
+      // No timestamp
       expect(validateCommand({
         type: CommandType.SLEEP,
-        // @ts-ignore - Testando sem timestamp
+        // @ts-ignore - Testing without timestamp
         timestamp: undefined
       })).toBe(false);
 
-      // SET_REPORTING sem payload correto
+      // SET_REPORTING without proper payload
       expect(validateCommand({
         type: CommandType.SET_REPORTING,
         timestamp: Date.now()
@@ -96,27 +103,27 @@ describe('Validadores', () => {
 
       expect(validateCommand({
         type: CommandType.SET_REPORTING,
-        payload: { }, // Sem intervalo
+        payload: { }, // No interval
         timestamp: Date.now()
       })).toBe(false);
 
       expect(validateCommand({
         type: CommandType.SET_REPORTING,
-        payload: { interval: 'invalid' }, // Intervalo não-numérico
+        payload: { interval: 'invalid' }, // Non-numeric interval
         timestamp: Date.now()
       })).toBe(false);
     });
   });
 
   describe('validateDeviceConfig', () => {
-    test('deve aceitar configurações válidas', () => {
+    test('should accept valid configurations', () => {
       expect(validateDeviceConfig({})).toBe(true);
       expect(validateDeviceConfig({ reportingInterval: 60 })).toBe(true);
       expect(validateDeviceConfig({ sleepThreshold: 15 })).toBe(true);
       expect(validateDeviceConfig({ securityLevel: 3 })).toBe(true);
     });
 
-    test('deve rejeitar configurações inválidas', () => {
+    test('should reject invalid configurations', () => {
       expect(validateDeviceConfig({ reportingInterval: 0 })).toBe(false);
       expect(validateDeviceConfig({ reportingInterval: -1 })).toBe(false);
       expect(validateDeviceConfig({ reportingInterval: 86401 })).toBe(false);
