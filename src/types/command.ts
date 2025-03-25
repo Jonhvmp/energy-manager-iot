@@ -1,31 +1,62 @@
 /**
- * Tipos de comandos que podem ser enviados aos dispositivos IoT
+ * Command types that can be sent to IoT devices
+ *
+ * Defines the standard operations that can be performed on devices.
  */
 export enum CommandType {
-  SLEEP = 'sleep',          // Coloca o dispositivo em modo de economia de energia
-  WAKE = 'wake',            // Acorda o dispositivo do modo de economia
-  RESTART = 'restart',      // Reinicia o dispositivo
-  UPDATE = 'update',        // Solicita atualização do firmware
-  SET_REPORTING = 'set_reporting_interval', // Define intervalo de relatórios
-  GET_STATUS = 'get_status' // Solicita status atual
+  /** Put device into power saving mode */
+  SLEEP = 'sleep',
+
+  /** Exit power saving mode */
+  WAKE = 'wake',
+
+  /** Restart the device */
+  RESTART = 'restart',
+
+  /** Request firmware update */
+  UPDATE = 'update',
+
+  /** Configure status reporting interval */
+  SET_REPORTING = 'set_reporting_interval',
+
+  /** Request immediate status update */
+  GET_STATUS = 'get_status'
 }
 
 /**
- * Interface para comandos enviados aos dispositivos
+ * Device command interface
+ *
+ * Structure for commands sent to IoT devices.
  */
 export interface DeviceCommand {
+  /** Type of command to execute */
   type: CommandType;
+
+  /** Optional data payload for the command */
   payload?: any;
+
+  /** Timestamp when command was issued (epoch milliseconds) */
   timestamp: number;
+
+  /** Optional unique identifier to correlate responses */
   requestId?: string;
 }
 
 /**
- * Interface para resposta de comando dos dispositivos
+ * Command response interface
+ *
+ * Structure for responses from devices after processing commands.
  */
 export interface CommandResponse {
+  /** Whether the command was successfully executed */
   success: boolean;
+
+  /** Optional ID matching the original request */
   requestId?: string;
+
+  /** Optional message providing additional context */
   message?: string;
+
+  /** Timestamp when response was generated (epoch milliseconds) */
   timestamp: number;
 }
