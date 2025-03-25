@@ -1,6 +1,6 @@
 {
   "name": "energy-manager-iot",
-  "version": "1.1.1",
+  "version": "1.0.2",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -58,7 +58,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/jonhvmp/energy-manager-iot"
+    "url": "git+https://github.com/jonhvmp/energy-manager-iot.git"
   },
   "bugs": {
     "url": "https://github.com/jonhvmp/energy-manager-iot/issues"
