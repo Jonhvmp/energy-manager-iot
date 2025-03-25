@@ -1,62 +1,68 @@
+/**
+ * Advanced usage example of the Energy Manager IoT library
+ *
+ * This example demonstrates more complex features including event handling,
+ * custom configurations, and group commands.
+ */
 import { EnergyManager, DeviceType, CommandType } from '../src';
 
 async function advancedExample() {
-  console.log('Iniciando exemplo avançado de Energy Manager IoT');
+  console.log('Starting advanced Energy Manager IoT example');
 
-  // Criar instância com reconexão automática e verificação de status a cada 30 segundos
+  // Create instance with auto-reconnect and status check every 30 seconds
   const manager = new EnergyManager({
     topicPrefix: 'advanced/devices/',
     mqttOptions: { clientId: 'advanced-manager' },
     statusInterval: 30000
   });
 
-  // Configurar ouvintes para eventos relevantes
-  manager.on('connected', () => console.log('Conectado ao broker MQTT'));
-  manager.on('disconnected', () => console.log('Desconectado do broker MQTT'));
+  // Set up listeners for relevant events
+  manager.on('connected', () => console.log('Connected to MQTT broker'));
+  manager.on('disconnected', () => console.log('Disconnected from MQTT broker'));
   manager.on('statusUpdate', (deviceId, status) =>
-    console.log(`Status atualizado para ${deviceId}:`, status)
+    console.log(`Status updated for ${deviceId}:`, status)
   );
   manager.on('deviceOffline', (deviceId) =>
-    console.log(`Dispositivo ${deviceId} marcado como offline`)
+    console.log(`Device ${deviceId} marked as offline`)
   );
   manager.on('commandSent', (deviceId, command) =>
-    console.log(`Comando enviado para ${deviceId}:`, command)
+    console.log(`Command sent to ${deviceId}:`, command)
   );
 
   try {
-    // Conectar ao broker local
+    // Connect to local broker
     await manager.connect('mqtt://localhost:1883');
 
-    // Registrar dispositivos avançados
-    manager.registerDevice('sensor-advanced-01', 'Sensor Avançado 01', DeviceType.SENSOR, {
+    // Register advanced devices
+    manager.registerDevice('sensor-advanced-01', 'Advanced Sensor 01', DeviceType.SENSOR, {
       reportingInterval: 30,
       sleepThreshold: 20
     });
-    manager.registerDevice('camera-advanced-01', 'Câmera Avançada 01', DeviceType.CAMERA, {
+    manager.registerDevice('camera-advanced-01', 'Advanced Camera 01', DeviceType.CAMERA, {
       reportingInterval: 60
     });
 
-    // Criar grupos e associar dispositivos
+    // Create groups and associate devices
     manager.createGroup('advanced-group');
     manager.addDeviceToGroup('sensor-advanced-01', 'advanced-group');
     manager.addDeviceToGroup('camera-advanced-01', 'advanced-group');
 
-    // Enviar comando para atualizar intervalo de relatório de um dispositivo
+    // Send command to update reporting interval for a device
     await manager.sendCommand('camera-advanced-01', CommandType.SET_REPORTING, { interval: 45 });
 
-    // Enviar comando para colocar todos os dispositivos do grupo em modo sleep
+    // Send command to put all devices in the group to sleep mode
     await manager.sleepGroup('advanced-group', 3600);
 
-    // Manter a aplicação rodando por 1 minuto para observar atualizações
+    // Keep the application running for 1 minute to observe updates
     await new Promise(resolve => setTimeout(resolve, 60000));
 
-    // Desconectar ao final
+    // Disconnect when finished
     await manager.disconnect();
-    console.log('Exemplo avançado finalizado');
+    console.log('Advanced example completed');
   } catch (error) {
-    console.error('Erro no exemplo avançado:', error);
+    console.error('Error in advanced example:', error);
   }
 }
 
-// Executar o exemplo
+// Run the example
 advancedExample();

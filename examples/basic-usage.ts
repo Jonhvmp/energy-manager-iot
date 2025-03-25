@@ -1,12 +1,15 @@
 /**
- * Exemplo básico de uso da biblioteca Energy Manager IoT
+ * Basic usage example of the Energy Manager IoT library
+ *
+ * This example demonstrates the core functionality including device registration,
+ * group management, and command sending.
  */
 import { EnergyManager, DeviceType, CommandType, PowerMode } from '../src';
 
 async function basicExample() {
-  console.log('Iniciando exemplo básico de Energy Manager IoT');
+  console.log('Starting basic Energy Manager IoT example');
 
-  // Criar instância do gerenciador
+  // Create manager instance
   const energyManager = new EnergyManager({
     topicPrefix: 'home/devices/',
     mqttOptions: {
@@ -15,59 +18,59 @@ async function basicExample() {
     }
   });
 
-  // Configurar listeners de eventos
+  // Set up event listeners
   energyManager.on('connected', () => {
-    console.log('Conectado ao broker MQTT');
+    console.log('Connected to MQTT broker');
   });
 
   energyManager.on('statusUpdate', (deviceId, status) => {
-    console.log(`Status atualizado para ${deviceId}:`, status);
+    console.log(`Status updated for ${deviceId}:`, status);
   });
 
-  // Conectar ao broker MQTT (ex. Mosquitto local)
+  // Connect to MQTT broker (e.g., local Mosquitto)
   try {
     await energyManager.connect('mqtt://localhost:1883');
 
-    // Registrar alguns dispositivos
-    energyManager.registerDevice('temp-sensor-01', 'Sensor de Temperatura Sala', DeviceType.SENSOR, {
-      reportingInterval: 60, // a cada 60 segundos
-      sleepThreshold: 15     // dormir quando bateria < 15%
+    // Register some devices
+    energyManager.registerDevice('temp-sensor-01', 'Living Room Temperature Sensor', DeviceType.SENSOR, {
+      reportingInterval: 60, // every 60 seconds
+      sleepThreshold: 15
     });
 
-    energyManager.registerDevice('motion-sensor-01', 'Sensor de Movimento Entrada', DeviceType.SENSOR);
-    energyManager.registerDevice('camera-01', 'Câmera Externa', DeviceType.CAMERA);
+    energyManager.registerDevice('motion-sensor-01', 'Entrance Motion Sensor', DeviceType.SENSOR);
+    energyManager.registerDevice('camera-01', 'External Camera', DeviceType.CAMERA);
 
-    // Criar um grupo
+    // Create a group
     energyManager.createGroup('living-room');
 
-    // Adicionar dispositivos ao grupo
+    // Add devices to the group
     energyManager.addDeviceToGroup('temp-sensor-01', 'living-room');
     energyManager.addDeviceToGroup('motion-sensor-01', 'living-room');
 
-    // Enviar comando para um dispositivo
+    // Send command to a device
     await energyManager.sendCommand('camera-01', CommandType.SET_REPORTING, { interval: 300 });
 
-    // Colocar todos os dispositivos da sala em modo de economia
-    await energyManager.sleepGroup('living-room', 3600); // hibernar por 1 hora
+    // Put all devices in the living room into power saving mode
+    await energyManager.sleepGroup('living-room', 3600); // sleep for 1 hour
 
-    // Acordar um dispositivo específico
+    // Wake up a specific device
     await energyManager.wakeDevice('temp-sensor-01');
 
-    // Obter estatísticas do grupo
+    // Get group statistics
     const stats = energyManager.getGroupStatistics('living-room');
-    console.log('Estatísticas do grupo living-room:', stats);
+    console.log('Statistics for living-room group:', stats);
 
-    // Manter a aplicação rodando por um tempo
+    // Keep the application running for a while
     await new Promise(resolve => setTimeout(resolve, 60000));
 
-    // Desconectar ao finalizar
+    // Disconnect when finished
     await energyManager.disconnect();
-    console.log('Exemplo finalizado');
+    console.log('Example completed');
 
   } catch (error) {
-    console.error('Erro no exemplo:', error);
+    console.error('Error in example:', error);
   }
 }
 
-// Executar o exemplo
+// Run the example
 basicExample();

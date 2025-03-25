@@ -1,94 +1,97 @@
 /**
- * Exemplo de gerenciamento de grupos de dispositivos
+ * Example of device group management
+ *
+ * This example demonstrates how to create groups, add devices to them,
+ * and send commands to multiple devices at once using groups.
  */
 import { EnergyManager, DeviceType, CommandType } from '../src';
 
 async function groupManagementExample() {
-  console.log('Iniciando exemplo de gerenciamento de grupos');
+  console.log('Starting group management example');
 
-  // Criar instância do gerenciador
+  // Create manager instance
   const energyManager = new EnergyManager();
 
   try {
-    // Conectar ao broker
+    // Connect to broker
     await energyManager.connect('mqtt://localhost:1883', {
       username: 'user',
       password: 'password',
       reconnectPeriod: 3000
     });
 
-    // Criar grupos para diferentes ambientes
+    // Create groups for different environments
     energyManager.createGroup('kitchen');
     energyManager.createGroup('bedroom');
     energyManager.createGroup('outdoor');
 
-    console.log('Grupos criados:', energyManager.getAllGroups());
+    console.log('Groups created:', energyManager.getAllGroups());
 
-    // Registrar dispositivos
-    console.log('Registrando dispositivos...');
+    // Register devices
+    console.log('Registering devices...');
 
-    // Dispositivos da cozinha
-    energyManager.registerDevice('temp-kitchen', 'Sensor Temp Cozinha', DeviceType.SENSOR, {}, ['kitchen']);
-    energyManager.registerDevice('light-kitchen', 'Luz Cozinha', DeviceType.ACTUATOR, {}, ['kitchen']);
+    // Kitchen devices
+    energyManager.registerDevice('temp-kitchen', 'Kitchen Temperature Sensor', DeviceType.SENSOR, {}, ['kitchen']);
+    energyManager.registerDevice('light-kitchen', 'Kitchen Light', DeviceType.ACTUATOR, {}, ['kitchen']);
 
-    // Dispositivos do quarto
-    energyManager.registerDevice('temp-bedroom', 'Sensor Temp Quarto', DeviceType.SENSOR, {}, ['bedroom']);
-    energyManager.registerDevice('humidity-bedroom', 'Sensor Umidade Quarto', DeviceType.SENSOR, {}, ['bedroom']);
+    // Bedroom devices
+    energyManager.registerDevice('temp-bedroom', 'Bedroom Temperature Sensor', DeviceType.SENSOR, {}, ['bedroom']);
+    energyManager.registerDevice('humidity-bedroom', 'Bedroom Humidity Sensor', DeviceType.SENSOR, {}, ['bedroom']);
 
-    // Dispositivos externos
-    energyManager.registerDevice('camera-front', 'Câmera Frontal', DeviceType.CAMERA, {}, ['outdoor']);
-    energyManager.registerDevice('camera-back', 'Câmera Traseira', DeviceType.CAMERA, {}, ['outdoor']);
+    // Outdoor devices
+    energyManager.registerDevice('camera-front', 'Front Camera', DeviceType.CAMERA, {}, ['outdoor']);
+    energyManager.registerDevice('camera-back', 'Back Camera', DeviceType.CAMERA, {}, ['outdoor']);
 
-    // Criar um grupo para todos os sensores
+    // Create a group for all sensors
     energyManager.createGroup('all-sensors');
 
-    // Adicionar todos os sensores ao grupo de sensores
+    // Add all sensors to the sensors group
     energyManager.addDeviceToGroup('temp-kitchen', 'all-sensors');
     energyManager.addDeviceToGroup('temp-bedroom', 'all-sensors');
     energyManager.addDeviceToGroup('humidity-bedroom', 'all-sensors');
 
-    // Verificar dispositivos em cada grupo
-    console.log('\nDispositivos por grupo:');
+    // Check devices in each group
+    console.log('\nDevices by group:');
     for (const group of energyManager.getAllGroups()) {
       const devices = energyManager.getDevicesInGroup(group);
-      console.log(`Grupo "${group}": ${devices.length} dispositivos`);
+      console.log(`Group "${group}": ${devices.length} devices`);
       devices.forEach(device => {
         console.log(`  - ${device.name} (${device.id})`);
       });
     }
 
-    // Enviar comandos para grupos específicos
-    console.log('\nEnviando comandos para grupos...');
+    // Send commands to specific groups
+    console.log('\nSending commands to groups...');
 
-    // Reduzir intervalo de relatórios para câmeras externas
+    // Reduce reporting interval for outdoor cameras
     await energyManager.sendCommandToGroup('outdoor', CommandType.SET_REPORTING, { interval: 30 });
-    console.log('Comando SET_REPORTING enviado para grupo "outdoor"');
+    console.log('SET_REPORTING command sent to "outdoor" group');
 
-    // Colocar todos os sensores em modo de economia durante a noite
-    await energyManager.sleepGroup('all-sensors', 28800); // 8 horas
-    console.log('Comando SLEEP enviado para grupo "all-sensors"');
+    // Put all sensors in power saving mode during the night
+    await energyManager.sleepGroup('all-sensors', 28800); // 8 hours
+    console.log('SLEEP command sent to "all-sensors" group');
 
-    // Remover um dispositivo de um grupo
+    // Remove a device from a group
     energyManager.removeDeviceFromGroup('temp-kitchen', 'all-sensors');
-    console.log('\nDispositivo temp-kitchen removido do grupo all-sensors');
+    console.log('\nDevice temp-kitchen removed from all-sensors group');
 
-    // Verificar grupos de um dispositivo específico
+    // Check groups for a specific device
     const cameraFront = energyManager.getDevice('camera-front');
-    console.log(`\nGrupos do dispositivo ${cameraFront.name}:`, cameraFront.groups);
+    console.log(`\nGroups for device ${cameraFront.name}:`, cameraFront.groups);
 
-    // Remover um grupo
+    // Remove a group
     energyManager.removeGroup('bedroom');
-    console.log('\nGrupo "bedroom" removido');
-    console.log('Grupos restantes:', energyManager.getAllGroups());
+    console.log('\nGroup "bedroom" removed');
+    console.log('Remaining groups:', energyManager.getAllGroups());
 
-    // Desconectar
+    // Disconnect
     await energyManager.disconnect();
-    console.log('\nExemplo finalizado');
+    console.log('\nExample completed');
 
   } catch (error) {
-    console.error('Erro no exemplo:', error);
+    console.error('Error in example:', error);
   }
 }
 
-// Executar o exemplo
+// Run the example
 groupManagementExample();
