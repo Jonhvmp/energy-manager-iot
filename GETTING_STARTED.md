@@ -1,66 +1,66 @@
 # Getting Started
 
-Este guia explica como configurar o Mosquitto e rodar os exemplos da biblioteca Energy Manager IoT.
+This guide explains how to set up Mosquitto and run the examples from the Energy Manager IoT library.
 
-## 1. Instalando o Mosquitto
+## 1. Installing Mosquitto
 
 ### Windows
-- Baixe o instalador do Mosquitto em [https://mosquitto.org/download/](https://mosquitto.org/download/).
-- Siga as instruções do instalador e, se necessário, adicione o Mosquitto ao PATH do sistema.
-- Para iniciar o broker, abra o prompt de comando e execute:
+- Download the Mosquitto installer from [https://mosquitto.org/download/](https://mosquitto.org/download/).
+- Follow the installer instructions and, if necessary, add Mosquitto to the system PATH.
+- To start the broker, open the command prompt and run:
   ```bash
   mosquitto -v
   ```
 
 ### Linux (Debian/Ubuntu)
-- Instale com os comandos:
+- Install with the commands:
   ```bash
   sudo apt update
   sudo apt install mosquitto mosquitto-clients
   ```
-- Inicie o broker:
+- Start the broker:
   ```bash
   sudo systemctl start mosquitto
   ```
-- Para verificar o status:
+- To check the status:
   ```bash
   sudo systemctl status mosquitto
   ```
 
 ### macOS
-- Instale via Homebrew:
+- Install via Homebrew:
   ```bash
   brew install mosquitto
   ```
-- Inicie o broker:
+- Start the broker:
   ```bash
   brew services start mosquitto
   ```
 
-## 2. Configurando o Mosquitto
+## 2. Configuring Mosquitto
 
-Os arquivos de configuração padrão geralmente funcionam bem para testes. Se precisar de personalizações, edite o arquivo de configuração (ex.: /etc/mosquitto/mosquitto.conf no Linux).
+The default configuration files generally work well for testing. If you need customizations, edit the configuration file (e.g., /etc/mosquitto/mosquitto.conf on Linux).
 
-## 3. Rodando os exemplos
+## 3. Running the Examples
 
-Após configurar o Mosquitto, você pode testar a biblioteca:
+After configuring Mosquitto, you can test the library:
 
-1. Faça a build do projeto (caso ainda não tenha feito):
+1. Build the project (if you haven't already):
    ```bash
    npm run build
    ```
 
-2. Execute um exemplo, por exemplo:
+2. Run an example, for instance:
    ```bash
    npm run example:basic
    ```
-   Ou para gerenciamento de grupos:
+   Or for group management:
    ```bash
    npm run example:group
    ```
 
-3. Verifique os logs e mensagens de status no console para confirmar a comunicação com o broker MQTT.
+3. Check the logs and status messages in the console to confirm communication with the MQTT broker.
 
-## 4. Continue explorando
+## 4. Continue Exploring
 
-Para mais detalhes, consulte o arquivo [README.md](./README.md) e a documentação da biblioteca.
+For more details, see the [README.md](./README.md) file and the library documentation.

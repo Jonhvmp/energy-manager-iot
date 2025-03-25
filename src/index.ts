@@ -1,21 +1,23 @@
 /**
- * Energy Manager IoT - Biblioteca para gerenciamento de energia em dispositivos IoT
- * via protocolo MQTT
+ * Energy Manager IoT - Library for managing energy in IoT devices
+ * via MQTT protocol
+ *
+ * @packageDocumentation
  */
 
-// Exportar classe principal
+// Export main classes
 export { EnergyManager, EnergyManagerOptions } from './lib/energy-manager';
 export { MqttHandler, MqttHandlerOptions } from './lib/mqtt-handler';
 export { DeviceRegistry } from './lib/device-registry';
 
-// Exportar tipos
+// Export types
 export { Device, DeviceType, DeviceConfig } from './types/device';
 export { DeviceStatus, PowerMode, ConnectionStatus, GroupStatistics } from './types/status';
 export { DeviceCommand, CommandType, CommandResponse } from './types/command';
 
-// Exportar utilitários
+// Export utilities
 export { EnergyManagerError, ErrorType } from './utils/error-handler';
 export { default as Logger } from './utils/logger';
 
-// Versão da biblioteca
+// Library version
 export const VERSION = '1.0.0';
