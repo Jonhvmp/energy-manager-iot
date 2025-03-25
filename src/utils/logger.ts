@@ -1,7 +1,10 @@
 import { warn } from 'console';
 import winston from 'winston';
 
-// Níveis de log personalizados
+/**
+ * Custom log levels with numeric priorities
+ * Lower numbers represent higher priority levels
+ */
 const levels = {
   error: 0,
   warn: 1,
@@ -10,10 +13,13 @@ const levels = {
   debug: 4,
 };
 
-// Definir nível com base no ambiente
+// Set log level based on environment
 const level = process.env.NODE_ENV === 'production' ? 'info' : 'debug';
 
-// Formato customizado
+/**
+ * Log formatting configuration
+ * Includes timestamp, error stack traces, and JSON output
+ */
 const format = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
   winston.format.errors({ stack: true }),
@@ -21,9 +27,12 @@ const format = winston.format.combine(
   winston.format.json()
 );
 
-// Transportes para logs
+/**
+ * Log transport configurations
+ * Console for development and files for production logging
+ */
 const transports = [
-  // Console para desenvolvimento
+  // Console transport for development
   new winston.transports.Console({
     format: winston.format.combine(
       winston.format.colorize({ all: true }),
@@ -32,7 +41,7 @@ const transports = [
       ),
     ),
   }),
-  // Arquivo para produção
+  // File transports for production
   new winston.transports.File({
     filename: 'logs/error.log',
     level: 'error',
@@ -40,7 +49,7 @@ const transports = [
   new winston.transports.File({ filename: 'logs/combined.log' }),
 ];
 
-// Criar e exportar o logger
+// Create logger instance with Winston
 const Logger = winston.createLogger({
   level,
   levels,
@@ -48,6 +57,13 @@ const Logger = winston.createLogger({
   transports,
 });
 
+/**
+ * Format argument for logging
+ * Converts objects to JSON strings when possible
+ *
+ * @param arg - Value to format for logging
+ * @returns String representation of the value
+ */
 function formatArg(arg: any): string {
   if (typeof arg === 'object') {
     try {
@@ -59,19 +75,48 @@ function formatArg(arg: any): string {
   return String(arg);
 }
 
+/**
+ * Simplified logger interface that wraps console logging
+ * This can be replaced with the full Winston implementation as needed
+ */
 export default {
+  /**
+   * Log informational message
+   *
+   * @param msg - Primary message to log
+   * @param args - Additional data to include in the log
+   */
   info: (msg: string, ...args: any[]) => {
-    console.log(`${new Date().toISOString()} info: ${msg}
-    `, ...args.map(formatArg));
+    console.log(`${new Date().toISOString()} info: ${msg}`, ...args.map(formatArg));
   },
+
+  /**
+   * Log debug message
+   *
+   * @param msg - Primary message to log
+   * @param args - Additional data to include in the log
+   */
   debug: (msg: string, ...args: any[]) => {
     console.debug(`${new Date().toISOString()} debug: ${msg}`, ...args.map(formatArg));
   },
+
+  /**
+   * Log error message
+   *
+   * @param msg - Primary message to log
+   * @param args - Additional data to include in the log
+   */
   error: (msg: string, ...args: any[]) => {
     console.error(`${new Date().toISOString()} error: ${msg}`, ...args.map(formatArg));
   },
+
+  /**
+   * Log warning message
+   *
+   * @param msg - Primary message to log
+   * @param args - Additional data to include in the log
+   */
   warn: (msg: string, ...args: any[]) => {
-    console.warn(`${new Date().toISOString()} warn: ${msg}
-    `, ...args.map(formatArg));
+    console.warn(`${new Date().toISOString()} warn: ${msg}`, ...args.map(formatArg));
   },
 };

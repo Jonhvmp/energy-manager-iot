@@ -1,7 +1,7 @@
 import Logger from './logger';
 
 /**
- * Tipos de erros personalizados
+ * Custom error types for the Energy Manager system
  */
 export enum ErrorType {
   CONNECTION = 'connection_error',
@@ -14,35 +14,52 @@ export enum ErrorType {
 }
 
 /**
- * Classe personalizada para erros do Energy Manager
+ * Custom error class for Energy Manager errors
+ *
+ * Extends the standard Error class with additional properties
+ * for error type categorization and contextual data.
  */
 export class EnergyManagerError extends Error {
+  /** Classification of the error */
   type: ErrorType;
+
+  /** Optional data related to the error context */
   data?: any;
 
+  /**
+   * Creates a new Energy Manager error
+   *
+   * @param message - Human-readable error message
+   * @param type - Error type classification
+   * @param data - Optional data or original error
+   */
   constructor(message: string, type: ErrorType, data?: any) {
     super(message);
     this.name = 'EnergyManagerError';
     this.type = type;
     this.data = data;
 
-    // Capturar stack trace corretamente no TypeScript
+    // Correctly capture stack trace in TypeScript
     Object.setPrototypeOf(this, EnergyManagerError.prototype);
   }
 }
 
 /**
- * Função para lidar com erros de forma consistente
+ * Handles errors in a consistent way across the library
+ *
+ * @param error - Error object to handle
+ * @param context - Optional context information for the error
+ * @throws The original error after logging it
  */
 export function handleError(error: Error | EnergyManagerError, context?: string): never {
-  // Se for nosso erro personalizado, registre com informações adicionais
+  // If it's our custom error, log with additional information
   if (error instanceof EnergyManagerError) {
     Logger.error(`[${error.type}]${context ? ` (${context})` : ''}: ${error.message}`, {
       errorData: error.data,
       stack: error.stack
     });
   } else {
-    // Para outros erros
+    // For other errors
     Logger.error(`[UNEXPECTED_ERROR]${context ? ` (${context})` : ''}: ${error.message}`, {
       stack: error.stack
     });

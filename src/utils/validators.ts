@@ -2,44 +2,72 @@ import { DeviceCommand, CommandType } from '../types/command';
 import { DeviceConfig } from '../types/device';
 
 /**
- * Valida ID de dispositivo
+ * Validates a device ID
+ *
+ * @param id - Device ID to validate
+ * @returns True if ID is valid
+ *
+ * @remarks
+ * Valid device IDs must be 3-50 characters in length and contain only
+ * alphanumeric characters, hyphens, and underscores.
  */
 export function validateDeviceId(id: string): boolean {
-  // ID deve ter entre 3-50 caracteres, alfanuméricos e hífens/underscores
+  // ID must be 3-50 characters, alphanumeric and hyphens/underscores
   return /^[a-zA-Z0-9_-]{3,50}$/.test(id);
 }
 
 /**
- * Valida nome de grupo
+ * Validates a group name
+ *
+ * @param name - Group name to validate
+ * @returns True if name is valid
+ *
+ * @remarks
+ * Valid group names must be 2-50 characters in length and contain only
+ * alphanumeric characters, spaces, and hyphens.
  */
 export function validateGroupName(name: string): boolean {
-  // Nome deve ter entre 2-50 caracteres, sem caracteres especiais exceto espaço e hífen
+  // Name must be 2-50 characters, no special characters except spaces and hyphens
   return /^[a-zA-Z0-9 -]{2,50}$/.test(name);
 }
 
 /**
- * Valida endereço do broker MQTT
+ * Validates an MQTT broker URL
+ *
+ * @param url - MQTT broker URL to validate
+ * @returns True if URL is valid
+ *
+ * @remarks
+ * Valid URLs must start with mqtt:// or mqtts:// and contain a properly
+ * formed host name with optional port number.
  */
 export function validateMqttBrokerUrl(url: string): boolean {
-  // Verifica se a URL é válida para MQTT (mqtt:// ou mqtts://)
+  // Check if URL is valid for MQTT (mqtt:// or mqtts://)
   return /^mqtt(s)?:\/\/[a-zA-Z0-9_.-]+(\:[0-9]+)?$/.test(url);
 }
 
 /**
- * Valida comando de dispositivo
+ * Validates a device command structure
+ *
+ * @param command - Command object to validate
+ * @returns True if command is valid
+ *
+ * @remarks
+ * Validates that command type is valid, timestamp exists,
+ * and command-specific requirements are met.
  */
 export function validateCommand(command: DeviceCommand): boolean {
-  // Verifica se é um tipo de comando válido
+  // Check if command type is valid
   if (!Object.values(CommandType).includes(command.type)) {
     return false;
   }
 
-  // Verifica timestamp
+  // Check timestamp
   if (!command.timestamp || typeof command.timestamp !== 'number') {
     return false;
   }
 
-  // Validações específicas para cada tipo de comando
+  // Command-specific validations
   if (command.type === CommandType.SET_REPORTING &&
       (!command.payload || typeof command.payload.interval !== 'number')) {
     return false;
@@ -49,7 +77,13 @@ export function validateCommand(command: DeviceCommand): boolean {
 }
 
 /**
- * Valida configuração de dispositivo
+ * Validates device configuration
+ *
+ * @param config - Device configuration to validate
+ * @returns True if configuration is valid
+ *
+ * @remarks
+ * Validates the ranges and types of configuration parameters.
  */
 export function validateDeviceConfig(config: DeviceConfig): boolean {
   if (config.reportingInterval !== undefined &&
