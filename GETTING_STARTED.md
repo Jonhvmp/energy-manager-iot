@@ -2,6 +2,8 @@
 
 This guide explains how to set up Mosquitto and run the examples from the Energy Manager IoT library.
 
+**[📚 View Complete Documentation](https://energy-manager-iot.vercel.app/en)**
+
 ## 1. Installing Mosquitto
 
 ### Windows

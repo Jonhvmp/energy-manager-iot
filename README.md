@@ -7,6 +7,8 @@
 
 A Node.js library for efficient energy management in IoT devices through MQTT protocol.
 
+**[📚 Full Documentation](https://energy-manager-iot.vercel.app/en)**
+
 ## Features
 
 - Robust MQTT connectivity with automatic reconnection support
