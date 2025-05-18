@@ -1,6 +1,6 @@
 {
   "name": "energy-manager-iot",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -30,8 +30,8 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
-  "description": "Library for energy management in IoT devices via MQTT protocol. Documentation: https://energy-manager-iot.vercel.app/en",
-  "homepage": "https://energy-manager-iot.vercel.app/en",
+  "description": "Library for energy management in IoT devices via MQTT protocol. Documentation: https://jonhvmp.github.io/energy-manager-iot-docs/",
+  "homepage": "https://jonhvmp.github.io/energy-manager-iot-docs/",
   "dependencies": {
     "energy-manager-iot": "^1.0.0",
     "mqtt": "^5.0.3",
