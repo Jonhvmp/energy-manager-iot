@@ -18,6 +18,7 @@ import Logger from '../utils/logger';
 export class DeviceRegistry {
   private devices: Map<string, Device>;
   private groups: Map<string, Set<string>>;
+  private logger = Logger.child('DeviceRegistry');
 
   constructor() {
     this.devices = new Map<string, Device>();
@@ -88,11 +89,14 @@ export class DeviceRegistry {
       for (const groupName of groups) {
         this.addDeviceToGroup(id, groupName, device);
       }
-    }
-
-    // Store device
+    }    // Store device
     this.devices.set(id, device);
-    Logger.info(`Device registered: ${id} (${name})`);
+    this.logger.info(`Device registered successfully`, {
+      deviceId: id,
+      deviceName: name,
+      deviceType: type,
+      groupCount: groups.length
+    });
 
     return device;
   }
@@ -129,11 +133,13 @@ export class DeviceRegistry {
     }
 
     // Update timestamp
-    device.updatedAt = Date.now();
-
-    // Update in map
+    device.updatedAt = Date.now();    // Update in map
     this.devices.set(id, device);
-    Logger.info(`Device updated: ${id}`);
+    this.logger.info(`Device updated`, {
+      deviceId: id,
+      updatedFields: Object.keys(updates),
+      timestamp: device.updatedAt
+    });
 
     return device;
   }
@@ -151,11 +157,13 @@ export class DeviceRegistry {
 
     // Update status and timestamp
     device.status = status;
-    device.updatedAt = Date.now();
-
-    // Update in map
+    device.updatedAt = Date.now();    // Update in map
     this.devices.set(id, device);
-    Logger.debug(`Status updated for device ${id}`);
+    this.logger.debug(`Device status updated`, {
+      deviceId: id,
+      connectionStatus: status.connectionStatus,
+      timestamp: device.updatedAt
+    });
 
     return device;
   }
@@ -180,11 +188,13 @@ export class DeviceRegistry {
       if (group) {
         group.delete(id);
       }
-    }
-
-    // Remove from registry
+    }    // Remove from registry
     this.devices.delete(id);
-    Logger.info(`Device removed: ${id}`);
+    this.logger.info(`Device removed from registry`, {
+      deviceId: id,
+      deviceName: device.name,
+      removedFromGroups: device.groups
+    });
 
     return true;
   }
@@ -195,15 +205,18 @@ export class DeviceRegistry {
    * @param id - ID of the device to retrieve
    * @returns The device object
    * @throws {EnergyManagerError} If device not found
-   */
-  public getDevice(id: string): Device {
+   */  public getDevice(id: string): Device {
     const device = this.devices.get(id);
     if (!device) {
+      this.logger.warn(`Device lookup failed - device not found`, { deviceId: id });
       throw new EnergyManagerError(
         `Device not found: ${id}`,
         ErrorType.DEVICE_NOT_FOUND
       );
     }
+
+    // Add trace log for device retrieval
+    this.logger.trace(`Device retrieved`, { deviceId: id });
     return device;
   }
 
@@ -236,11 +249,12 @@ export class DeviceRegistry {
     // Check if group already exists
     if (this.groups.has(name)) {
       return false;
-    }
-
-    // Create empty group
+    }    // Create empty group
     this.groups.set(name, new Set<string>());
-    Logger.info(`Group created: ${name}`);
+    this.logger.info(`Group created`, {
+      groupName: name,
+      timestamp: Date.now()
+    });
 
     return true;
   }
@@ -280,9 +294,13 @@ export class DeviceRegistry {
       deviceRef.groups.push(groupName);
       deviceRef.updatedAt = Date.now();
       this.devices.set(deviceId, deviceRef);
-    }
-
-    Logger.debug(`Device ${deviceId} added to group ${groupName}`);
+    }    // Log with device correlation ID
+    this.logger.withCorrelationId(deviceId).debug(`Device added to group`, {
+      deviceId,
+      groupName,
+      deviceGroups: deviceRef.groups,
+      groupSize: group.size
+    });
     return true;
   }
 
@@ -310,11 +328,14 @@ export class DeviceRegistry {
     if (removed) {
       // Remove group from device's group list
       const device = this.devices.get(deviceId);
-      if (device) {
-        device.groups = device.groups.filter(g => g !== groupName);
+      if (device) {        device.groups = device.groups.filter(g => g !== groupName);
         device.updatedAt = Date.now();
         this.devices.set(deviceId, device);
-        Logger.debug(`Device ${deviceId} removed from group ${groupName}`);
+        this.logger.withCorrelationId(deviceId).debug(`Device removed from group`, {
+          deviceId,
+          groupName,
+          remainingGroups: device.groups.length
+        });
       }
     }
 
@@ -344,11 +365,13 @@ export class DeviceRegistry {
         device.updatedAt = Date.now();
         this.devices.set(deviceId, device);
       }
-    }
-
-    // Remove the group
+    }    // Remove the group
     this.groups.delete(name);
-    Logger.info(`Group removed: ${name}`);
+    this.logger.info(`Group removed`, {
+      groupName: name,
+      deviceCount: group.size,
+      timestamp: Date.now()
+    });
 
     return true;
   }
@@ -359,10 +382,10 @@ export class DeviceRegistry {
    * @param groupName - Name of the group to query
    * @returns Array of devices in the group
    * @throws {EnergyManagerError} If group not found
-   */
-  public getDevicesInGroup(groupName: string): Device[] {
+   */  public getDevicesInGroup(groupName: string): Device[] {
     // Check if group exists
     if (!this.groups.has(groupName)) {
+      this.logger.warn(`Group lookup failed - group not found`, { groupName });
       throw new EnergyManagerError(
         `Group not found: ${groupName}`,
         ErrorType.GROUP_NOT_FOUND
@@ -370,16 +393,26 @@ export class DeviceRegistry {
     }
 
     const group = this.groups.get(groupName)!;
-    const devices: Device[] = [];
-
-    // Collect all devices in the group
+    const devices: Device[] = [];    // Collect all devices in the group
     for (const deviceId of group) {
       const device = this.devices.get(deviceId);
       if (device) {
         devices.push(device);
+      } else {
+        // Log inconsistency in data
+        this.logger.warn(`Data inconsistency detected: Device in group not found in registry`, {
+          groupName,
+          deviceId,
+          timestamp: Date.now()
+        });
       }
     }
 
+    this.logger.debug(`Retrieved devices in group`, {
+      groupName,
+      deviceCount: devices.length,
+      totalMembersInGroup: group.size
+    });
     return devices;
   }
 
@@ -389,43 +422,51 @@ export class DeviceRegistry {
    * @param groupName - Name of the group to query
    * @returns Array of device IDs in the group
    * @throws {EnergyManagerError} If group not found
-   */
-  public getDeviceIdsInGroup(groupName: string): string[] {
+   */  public getDeviceIdsInGroup(groupName: string): string[] {
     // Check if group exists
     if (!this.groups.has(groupName)) {
+      this.logger.warn(`Group lookup failed - group not found`, { groupName });
       throw new EnergyManagerError(
         `Group not found: ${groupName}`,
         ErrorType.GROUP_NOT_FOUND
       );
     }
 
-    return Array.from(this.groups.get(groupName)!);
+    const deviceIds = Array.from(this.groups.get(groupName)!);
+    this.logger.trace(`Retrieved device IDs from group`, {
+      groupName,
+      deviceCount: deviceIds.length
+    });
+    return deviceIds;
   }
 
   /**
    * Retrieves all existing group names
    *
    * @returns Array of group names
-   */
-  public getAllGroups(): string[] {
-    return Array.from(this.groups.keys());
+   */  public getAllGroups(): string[] {
+    const groups = Array.from(this.groups.keys());
+    this.logger.trace(`Retrieved all groups`, { groupCount: groups.length });
+    return groups;
   }
 
   /**
    * Retrieves all devices in the registry
    *
    * @returns Array of all devices
-   */
-  public getAllDevices(): Device[] {
-    return Array.from(this.devices.values());
+   */  public getAllDevices(): Device[] {
+    const devices = Array.from(this.devices.values());
+    this.logger.trace(`Retrieved all devices`, { deviceCount: devices.length });
+    return devices;
   }
 
   /**
    * Retrieves all device IDs in the registry
    *
    * @returns Array of all device IDs
-   */
-  public getAllDeviceIds(): string[] {
-    return Array.from(this.devices.keys());
+   */  public getAllDeviceIds(): string[] {
+    const deviceIds = Array.from(this.devices.keys());
+    this.logger.trace(`Retrieved all device IDs`, { deviceCount: deviceIds.length });
+    return deviceIds;
   }
 }
