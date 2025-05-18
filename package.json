@@ -18,7 +18,8 @@
     "prepare": "npm run build",
     "example:basic": "ts-node examples/basic-usage.ts",
     "example:group": "ts-node examples/group-management.ts",
-    "example:simulator": "ts-node examples/device-simulator.ts"
+    "example:simulator": "ts-node examples/device-simulator.ts",
+    "example:logging": "ts-node examples/advanced-logging.ts"
   },
   "keywords": [
     "iot",

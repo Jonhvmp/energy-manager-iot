@@ -17,7 +17,8 @@ A Node.js library for efficient energy management in IoT devices through MQTT pr
 - Receive and store device status (e.g., battery level, power mode)
 - Group analytics, such as average battery level and power mode distribution
 - Full TypeScript support with strong typing
-- Robust error handling and detailed logging
+- Professional logging system with contextual tracking and correlation IDs
+- Comprehensive error handling with categorized errors and severity levels
 
 ## Installation
 
@@ -175,11 +176,54 @@ Commands are sent in the format:
 }
 ```
 
+## Advanced Logging
+
+The library includes a professional logging system that helps with debugging, monitoring, and diagnostics.
+
+```typescript
+import { Logger } from 'energy-manager-iot';
+
+// Module-specific logger
+const deviceLogger = Logger.child('devices');
+
+// Log with correlation ID for tracking related operations
+const operationLogger = deviceLogger.withCorrelationId('op-123456');
+operationLogger.info('Starting device registration');
+
+// Different log levels
+deviceLogger.debug('Detailed information for troubleshooting');
+deviceLogger.info('Normal operational messages');
+deviceLogger.warn('Warning condition');
+deviceLogger.error('Error condition', errorObject);
+```
+
+[Advanced Logging Documentation](./docs/logging.md)
+
+## Error Handling
+
+The library provides a comprehensive error handling system:
+
+```typescript
+import { EnergyManagerError, ErrorType, ErrorSeverity } from 'energy-manager-iot';
+
+try {
+  // Some operation
+} catch (error) {
+  throw new EnergyManagerError(
+    'Failed to connect to device',
+    ErrorType.CONNECTION,
+    { deviceId: 'temp-01' },
+    ErrorSeverity.HIGH
+  );
+}
+```
+
 ## Security Considerations
 
 - Use TLS/SSL (mqtts://) in production environments.
 - Configure authentication and access control in the MQTT broker.
 - Validate command payloads to prevent malicious information.
+- Enable logging in production for security audit trails.
 
 ## Developer
 
