@@ -464,8 +464,9 @@ export class DeviceRegistry {
    * Retrieves all device IDs in the registry
    *
    * @returns Array of all device IDs
-   */
-  public getAllDeviceIds(): string[] {
-    return Array.from(this.devices.keys());
+   */  public getAllDeviceIds(): string[] {
+    const deviceIds = Array.from(this.devices.keys());
+    this.logger.trace(`Retrieved all device IDs`, { deviceCount: deviceIds.length });
+    return deviceIds;
   }
 }

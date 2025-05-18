@@ -52,6 +52,7 @@ export class EnergyManager extends EventEmitter {
   private statusCheckInterval?: NodeJS.Timeout;
   private autoReconnect: boolean;
   private statusUpdateInterval: number;
+  private logger = Logger.child('EnergyManager');
 
   /**
    * Creates a new Energy Manager instance
@@ -80,11 +81,14 @@ export class EnergyManager extends EventEmitter {
    * @param brokerUrl - URL of the MQTT broker to connect to
    * @param options - Additional MQTT connection options
    * @throws {EnergyManagerError} If connection fails
-   */
-  public async connect(brokerUrl: string, options?: MqttHandlerOptions): Promise<void> {
+   */  public async connect(brokerUrl: string, options?: MqttHandlerOptions): Promise<void> {
+    const connectionId = `conn_${Date.now()}`;
+    const connLogger = this.logger.withCorrelationId(connectionId);
+
     try {
+      connLogger.info('Connecting to MQTT broker', { brokerUrl, options });
       await this.mqtt.connect(brokerUrl, options);
-      Logger.info('Energy Manager connected to MQTT broker');
+      connLogger.info('Successfully connected to MQTT broker');
 
       // Subscribe to status topics for existing devices
       await this.subscribeToAllDeviceStatuses();
@@ -94,7 +98,7 @@ export class EnergyManager extends EventEmitter {
 
       this.emit('connected');
     } catch (error) {
-      Logger.error('Failed to connect to MQTT broker', error);
+      connLogger.error('Failed to connect to MQTT broker', error);
       throw error;
     }
   }
@@ -103,17 +107,17 @@ export class EnergyManager extends EventEmitter {
    * Disconnects from the MQTT broker
    *
    * @throws {EnergyManagerError} If disconnection fails
-   */
-  public async disconnect(): Promise<void> {
+   */  public async disconnect(): Promise<void> {
     // Stop status checking
     this.stopStatusCheck();
 
     try {
+      this.logger.info('Disconnecting from MQTT broker');
       await this.mqtt.disconnect();
-      Logger.info('Energy Manager disconnected from MQTT broker');
+      this.logger.info('Successfully disconnected from MQTT broker');
       this.emit('disconnected');
     } catch (error) {
-      Logger.error('Error disconnecting from MQTT broker', error);
+      this.logger.error('Failed to disconnect from MQTT broker', error);
       throw error;
     }
   }
@@ -128,20 +132,23 @@ export class EnergyManager extends EventEmitter {
    * @param groups - Optional initial groups to assign the device to
    * @returns The newly registered device object
    * @throws {EnergyManagerError} If device ID is invalid or already exists
-   */
-  public registerDevice(
+   */  public registerDevice(
     id: string,
     name: string,
     type: DeviceType,
     config: DeviceConfig = {},
     groups: string[] = []
   ): Device {
+    // Create device-specific logger with correlation ID
+    const deviceLogger = this.logger.withCorrelationId(id);
+    deviceLogger.info('Registering new device', { id, name, type, groupCount: groups.length });
+
     const device = this.registry.registerDevice(id, name, type, config, groups);
 
     // Subscribe to status topic if connected
     if (this.mqtt.isClientConnected()) {
       this.subscribeToDeviceStatus(id).catch(err => {
-        Logger.error(`Error subscribing to status topic for ${id}`, err);
+        deviceLogger.error('Failed to subscribe to device status topic', err);
       });
     }
 
@@ -168,20 +175,28 @@ export class EnergyManager extends EventEmitter {
    *
    * @param id - ID of the device to remove
    * @returns True if device was successfully removed
-   */
-  public removeDevice(id: string): boolean {
+   */  public removeDevice(id: string): boolean {
+    const deviceLogger = this.logger.withCorrelationId(id);
+    deviceLogger.info('Removing device', { deviceId: id });
+
     // Unsubscribe from status topic
     if (this.mqtt.isClientConnected()) {
       const statusTopic = this.getStatusTopic(id);
+      deviceLogger.debug('Unsubscribing from device status topic', { topic: statusTopic });
+
       this.mqtt.unsubscribe(statusTopic).catch(err => {
-        Logger.error(`Error unsubscribing from ${id}`, err);
+        deviceLogger.error('Failed to unsubscribe from status topic', err);
       });
     }
 
     const result = this.registry.removeDevice(id);
     if (result) {
       this.emit('deviceRemoved', id);
+      deviceLogger.info('Device successfully removed');
+    } else {
+      deviceLogger.warn('Device removal failed - device may not exist');
     }
+
     return result;
   }
 
@@ -203,9 +218,20 @@ export class EnergyManager extends EventEmitter {
    * @param command - Type of command to send
    * @param payload - Optional data to include with the command
    * @throws {EnergyManagerError} If device not found or not connected to MQTT
-   */
-  public async sendCommand(deviceId: string, command: CommandType, payload?: any): Promise<void> {
+   */  public async sendCommand(deviceId: string, command: CommandType, payload?: any): Promise<void> {
+    // Generate request ID for tracking the command through the system
+    const requestId = this.generateRequestId();
+    const cmdLogger = this.logger.withCorrelationId(requestId);
+
+    cmdLogger.info('Sending command to device', {
+      deviceId,
+      commandType: command,
+      hasPayload: payload !== undefined,
+      requestId
+    });
+
     if (!this.registry.hasDevice(deviceId)) {
+      cmdLogger.warn('Command failed - device not found', { deviceId });
       throw new EnergyManagerError(
         `Device not found: ${deviceId}`,
         ErrorType.DEVICE_NOT_FOUND
@@ -213,6 +239,7 @@ export class EnergyManager extends EventEmitter {
     }
 
     if (!this.mqtt.isClientConnected()) {
+      cmdLogger.error('Command failed - not connected to MQTT broker');
       throw new EnergyManagerError(
         'Not connected to MQTT broker',
         ErrorType.CONNECTION
@@ -224,15 +251,19 @@ export class EnergyManager extends EventEmitter {
       type: command,
       payload,
       timestamp: Date.now(),
-      requestId: this.generateRequestId()
+      requestId
     };
 
     try {
       await this.mqtt.publish(commandTopic, commandObject, { qos: 1 });
-      Logger.info(`Command ${command} sent to device ${deviceId}`);
+      cmdLogger.info('Command successfully sent', {
+        deviceId,
+        topic: commandTopic,
+        timestamp: commandObject.timestamp
+      });
       this.emit('commandSent', deviceId, commandObject);
     } catch (error) {
-      Logger.error(`Failed to send command to ${deviceId}`, error);
+      cmdLogger.error('Failed to send command', error);
       throw error;
     }
   }
@@ -244,14 +275,29 @@ export class EnergyManager extends EventEmitter {
    * @param command - Type of command to send
    * @param payload - Optional data to include with the command
    * @throws {EnergyManagerError} If group not found or command delivery fails
-   */
-  public async sendCommandToGroup(groupName: string, command: CommandType, payload?: any): Promise<void> {
+   */  public async sendCommandToGroup(groupName: string, command: CommandType, payload?: any): Promise<void> {
+    // Generate a group operation ID for the entire command
+    const groupOpId = `group_cmd_${Date.now()}`;
+    const groupLogger = this.logger.withCorrelationId(groupOpId);
+
+    groupLogger.info('Sending command to device group', {
+      groupName,
+      commandType: command,
+      hasPayload: payload !== undefined
+    });
+
     const deviceIds = this.registry.getDeviceIdsInGroup(groupName);
 
     if (deviceIds.length === 0) {
-      Logger.warn(`Group ${groupName} has no devices`);
+      groupLogger.warn('Group command skipped - group has no devices', { groupName });
       return;
     }
+
+    groupLogger.debug('Preparing to send command to devices in group', {
+      groupName,
+      deviceCount: deviceIds.length,
+      deviceIds
+    });
 
     const promises: Promise<void>[] = [];
     for (const deviceId of deviceIds) {
@@ -260,9 +306,17 @@ export class EnergyManager extends EventEmitter {
 
     try {
       await Promise.all(promises);
-      Logger.info(`Command ${command} sent to group ${groupName} (${deviceIds.length} devices)`);
+      groupLogger.info('Command successfully sent to all devices in group', {
+        groupName,
+        commandType: command,
+        deviceCount: deviceIds.length
+      });
     } catch (error) {
-      Logger.error(`Error sending command to group ${groupName}`, error);
+      groupLogger.error('Failed to send command to all devices in group', {
+        groupName,
+        error,
+        commandType: command
+      });
       throw new EnergyManagerError(
         `Failed to send command to group ${groupName}`,
         ErrorType.COMMAND_FAILED,
@@ -395,8 +449,12 @@ export class EnergyManager extends EventEmitter {
    *
    * @param prefix - New prefix to use for all MQTT topics
    * @remarks This will resubscribe to all device status topics if prefix changes
-   */
-  public setTopicPrefix(prefix: string): void {
+   */  public setTopicPrefix(prefix: string): void {
+    this.logger.info('Updating topic prefix', {
+      oldPrefix: this.topicPrefix,
+      newPrefix: prefix
+    });
+
     // Ensure prefix ends with /
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
@@ -406,11 +464,12 @@ export class EnergyManager extends EventEmitter {
     const resubscribe = prefix !== this.topicPrefix && this.mqtt.isClientConnected();
 
     this.topicPrefix = prefix;
-    Logger.info(`Topic prefix set to: ${prefix}`);
+    this.logger.info('Topic prefix updated', { prefix: this.topicPrefix });
 
     if (resubscribe) {
+      this.logger.info('Resubscribing to status topics with new prefix');
       this.subscribeToAllDeviceStatuses().catch(err => {
-        Logger.error('Error resubscribing to status topics', err);
+        this.logger.error('Failed to resubscribe to status topics with new prefix', err);
       });
     }
   }
@@ -509,36 +568,52 @@ export class EnergyManager extends EventEmitter {
   /**
    * Processes incoming MQTT messages
    * @private
-   */
-  private handleIncomingMessage(topic: string, message: Buffer): void {
+   */  private handleIncomingMessage(topic: string, message: Buffer): void {
     // Check if it's a status topic
     const deviceId = this.extractDeviceIdFromStatusTopic(topic);
     if (!deviceId) {
+      this.logger.trace('Ignoring non-status message', { topic });
       return;
     }
 
+    // Create device-specific logger
+    const deviceLogger = this.logger.withCorrelationId(deviceId);
+
     try {
       // Parse message as JSON
-      const statusData = JSON.parse(message.toString());
+      const messageStr = message.toString();
+      deviceLogger.trace('Status message received', {
+        topic,
+        messageSize: messageStr.length
+      });
+
+      const statusData = JSON.parse(messageStr);
 
       // Check if it's a registered device
       if (this.registry.hasDevice(deviceId)) {
+        const timestamp = Date.now();
         // Update device status
         const device = this.registry.updateDeviceStatus(deviceId, {
           deviceId,
           ...statusData,
-          lastSeen: Date.now()
+          lastSeen: timestamp
         });
 
         // Emit status update event
         this.emit('statusUpdate', deviceId, device.status);
 
-        Logger.debug(`Status updated for ${deviceId}: ${message.toString()}`);
+        deviceLogger.debug('Device status updated', {
+          connectionStatus: device.status?.connectionStatus,
+          powerMode: device.status?.powerMode,
+          timestamp
+        });
       } else {
-        Logger.debug(`Status received for unregistered device: ${deviceId}`);
+        deviceLogger.debug('Status received for unregistered device', {
+          suggestedAction: 'Register the device to process its status updates'
+        });
       }
     } catch (err) {
-      Logger.error(`Error processing status message from ${deviceId}:`, err);
+      deviceLogger.error('Failed to process device status message', err);
     }
   }
 
@@ -585,13 +660,19 @@ export class EnergyManager extends EventEmitter {
   /**
    * Subscribes to all device status topics
    * @private
-   */
-  private async subscribeToAllDeviceStatuses(): Promise<void> {
+   */  private async subscribeToAllDeviceStatuses(): Promise<void> {
     if (!this.mqtt.isClientConnected()) {
+      this.logger.debug('Skipping subscription to device statuses - not connected to MQTT broker');
       return;
     }
 
     const deviceIds = this.registry.getAllDeviceIds();
+
+    this.logger.info('Subscribing to device status topics', {
+      deviceCount: deviceIds.length,
+      topicPrefix: this.topicPrefix
+    });
+
     const promises: Promise<void>[] = [];
 
     for (const deviceId of deviceIds) {
@@ -599,14 +680,16 @@ export class EnergyManager extends EventEmitter {
     }
 
     await Promise.all(promises);
-    Logger.info(`Subscribed to ${deviceIds.length} status topics`);
+    this.logger.info('Successfully subscribed to device status topics', {
+      deviceCount: deviceIds.length,
+      topics: deviceIds.map(id => this.getStatusTopic(id))
+    });
   }
 
   /**
    * Starts periodic status checking
    * @private
-   */
-  private startStatusCheck(): void {
+   */  private startStatusCheck(): void {
     if (this.statusCheckInterval) {
       clearInterval(this.statusCheckInterval);
     }
@@ -615,7 +698,10 @@ export class EnergyManager extends EventEmitter {
       this.checkDevicesStatus();
     }, this.statusUpdateInterval);
 
-    Logger.debug(`Status checking started (interval: ${this.statusUpdateInterval}ms)`);
+    this.logger.debug('Status checking started', {
+      intervalMs: this.statusUpdateInterval,
+      nextCheckAt: new Date(Date.now() + this.statusUpdateInterval).toISOString()
+    });
   }
 
   /**
@@ -626,26 +712,44 @@ export class EnergyManager extends EventEmitter {
     if (this.statusCheckInterval) {
       clearInterval(this.statusCheckInterval);
       this.statusCheckInterval = undefined;
-      Logger.debug('Status checking stopped');
+      this.logger.debug('Status checking stopped');
     }
   }
 
   /**
    * Checks status of all devices and marks them offline if not responsive
    * @private
-   */
-  private checkDevicesStatus(): void {
+   */  private checkDevicesStatus(): void {
+    this.logger.trace('Running periodic device status check');
+
     const devices = this.registry.getAllDevices();
     const now = Date.now();
+    const threshold = 2 * this.statusUpdateInterval;
+
+    // Keep statistics for logging
+    let checkedCount = 0;
+    let offlineCount = 0;
+    let markedOfflineCount = 0;
 
     for (const device of devices) {
+      checkedCount++;
+      const deviceLogger = this.logger.withCorrelationId(device.id);
+
       // Check if we have status
       if (device.status) {
+        const lastSeenDiff = now - device.status.lastSeen;
+
         // Check if status is outdated (2x status interval)
-        const threshold = 2 * this.statusUpdateInterval;
-        if (now - device.status.lastSeen > threshold) {
+        if (lastSeenDiff > threshold) {
           // Mark as offline if was online
           if (device.status.connectionStatus === ConnectionStatus.ONLINE) {
+            deviceLogger.info('Device connection lost - marking as offline', {
+              deviceId: device.id,
+              deviceName: device.name,
+              lastSeen: new Date(device.status.lastSeen).toISOString(),
+              timeSinceLastSeenMs: lastSeenDiff
+            });
+
             const updatedStatus = {
               ...device.status,
               connectionStatus: ConnectionStatus.OFFLINE,
@@ -655,12 +759,20 @@ export class EnergyManager extends EventEmitter {
             // Update status
             this.registry.updateDeviceStatus(device.id, updatedStatus);
             this.emit('deviceOffline', device.id);
-
-            Logger.debug(`Device marked as offline: ${device.id}`);
+            markedOfflineCount++;
+          } else {
+            offlineCount++;
           }
         }
       }
     }
+
+    this.logger.debug('Device status check completed', {
+      devicesChecked: checkedCount,
+      alreadyOffline: offlineCount,
+      newlyMarkedOffline: markedOfflineCount,
+      nextCheckAt: new Date(now + this.statusUpdateInterval).toISOString()
+    });
   }
 
   /**
