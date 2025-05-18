@@ -8,6 +8,7 @@
 import * as mqtt from 'mqtt';
 import { DeviceStatus, PowerMode, ConnectionStatus } from '../src/types/status';
 import { DeviceCommand, CommandType, CommandResponse } from '../src/types/command';
+import { Logger } from '../src';
 
 interface DeviceConfig {
   id: string;
@@ -28,6 +29,7 @@ class IoTDeviceSimulator {
   private status: DeviceStatus;
   private reportTimer?: NodeJS.Timeout;
   private batteryTimer?: NodeJS.Timeout;
+  private logger: typeof Logger;
 
   constructor(config: DeviceConfig) {
     this.config = {
@@ -38,6 +40,9 @@ class IoTDeviceSimulator {
       },
       ...config
     };
+
+    // Create a logger instance with device ID as correlation ID
+    this.logger = Logger.child(`device-${this.config.id}`).withCorrelationId(this.config.id);
 
     this.status = {
       deviceId: this.config.id,
@@ -50,14 +55,13 @@ class IoTDeviceSimulator {
       errors: []
     };
   }
-
   /**
    * Connect the simulated device to the MQTT broker
    */
   public async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        console.log(`Device ${this.config.name} (${this.config.id}) connecting...`);
+        this.logger.info(`Device ${this.config.name} (${this.config.id}) connecting...`);
         this.client = mqtt.connect(this.config.broker, {
           clientId: `device-${this.config.id}-${Math.random().toString(16).substring(2, 8)}`,
           username: this.config.username,
@@ -67,16 +71,16 @@ class IoTDeviceSimulator {
         });
 
         this.client.on('connect', () => {
-          console.log(`Device ${this.config.id} connected to broker ${this.config.broker}`);
+          this.logger.info(`Device ${this.config.id} connected to broker ${this.config.broker}`);
           this.status.connectionStatus = ConnectionStatus.ONLINE;
 
           // Subscribe to command topic
           const commandTopic = `${this.config.topicPrefix}${this.config.id}/command`;
           this.client?.subscribe(commandTopic, { qos: 1 }, (err) => {
             if (err) {
-              console.error(`Error subscribing to command topic:`, err);
+              this.logger.error(`Error subscribing to command topic:`, err);
             } else {
-              console.log(`Subscribed to command topic: ${commandTopic}`);
+              this.logger.debug(`Subscribed to command topic: ${commandTopic}`);
             }
           });
 
@@ -90,17 +94,16 @@ class IoTDeviceSimulator {
         });
 
         this.client.on('error', (err) => {
-          console.error(`Connection error: ${err.message}`);
+          this.logger.error(`Connection error:`, err);
           reject(err);
         });
 
       } catch (err) {
-        console.error('Error connecting:', err);
+        this.logger.error('Error connecting:', err);
         reject(err);
       }
     });
   }
-
   /**
    * Disconnect the simulated device from the MQTT broker
    */
@@ -110,7 +113,7 @@ class IoTDeviceSimulator {
 
       if (this.client) {
         this.client.end(false, {}, () => {
-          console.log(`Device ${this.config.id} disconnected`);
+          this.logger.info(`Device ${this.config.id} disconnected`);
           this.status.connectionStatus = ConnectionStatus.OFFLINE;
           resolve();
         });
@@ -151,7 +154,6 @@ class IoTDeviceSimulator {
       clearInterval(this.batteryTimer);
     }
   }
-
   /**
    * Report device status to the MQTT broker
    * @private
@@ -172,9 +174,9 @@ class IoTDeviceSimulator {
 
     this.client.publish(statusTopic, JSON.stringify(formattedStatus), { qos: 1 }, (err) => {
       if (err) {
-        console.error(`Error publishing status:`, err);
+        this.logger.error(`Error publishing status:`, err);
       } else {
-        console.log(`Status published to ${statusTopic}: ${JSON.stringify(formattedStatus)}`);
+        this.logger.debug(`Status published to ${statusTopic}`, { status: formattedStatus });
       }
     });
   }
@@ -203,13 +205,14 @@ class IoTDeviceSimulator {
     this.status.batteryLevel = Math.max(
       0,
       this.status.batteryLevel - (this.config.batteryDrainRate * drainMultiplier)
-    );
-
-    // If battery is critically low, change to critical power mode
+    );    // If battery is critically low, change to critical power mode
     if (this.status.batteryLevel < 10 && this.powerMode !== PowerMode.CRITICAL) {
       this.powerMode = PowerMode.CRITICAL;
       this.status.powerMode = PowerMode.CRITICAL;
-      console.log(`${this.config.id}: Critical battery! Level: ${this.status.batteryLevel.toFixed(1)}%`);
+      this.logger.warn(`Critical battery level detected!`, {
+        batteryLevel: Number(this.status.batteryLevel.toFixed(1)),
+        powerMode: PowerMode.CRITICAL
+      });
       this.reportStatus();
     }
   }
@@ -219,18 +222,22 @@ class IoTDeviceSimulator {
    * @param _topic The MQTT topic the command was received on
    * @param message The command message
    * @private
-   */
-  private handleCommand(_topic: string, message: Buffer): void {
+   */  private handleCommand(_topic: string, message: Buffer): void {
     try {
       const command = JSON.parse(message.toString()) as DeviceCommand;
-      console.log(`${this.config.id}: Command received:`, command);
+      this.logger.info(`Command received`, { command });
+
+      // Create a command-specific logger with correlation ID from command if available
+      const cmdLogger = command.requestId
+        ? this.logger.withCorrelationId(command.requestId)
+        : this.logger;
 
       // Process command
       switch (command.type) {
         case CommandType.SLEEP:
           this.powerMode = PowerMode.SLEEP;
           this.status.powerMode = PowerMode.SLEEP;
-          console.log(`${this.config.id}: Entering sleep mode`);
+          cmdLogger.info(`Entering sleep mode`, { powerMode: PowerMode.SLEEP });
 
           // If duration provided, schedule wake up
           if (command.payload && command.payload.duration) {
@@ -238,7 +245,7 @@ class IoTDeviceSimulator {
             setTimeout(() => {
               this.powerMode = PowerMode.NORMAL;
               this.status.powerMode = PowerMode.NORMAL;
-              console.log(`${this.config.id}: Exiting sleep mode`);
+              cmdLogger.info(`Exiting sleep mode`, { powerMode: PowerMode.NORMAL });
               this.reportStatus();
             }, duration);
           }
@@ -247,7 +254,7 @@ class IoTDeviceSimulator {
         case CommandType.WAKE:
           this.powerMode = PowerMode.NORMAL;
           this.status.powerMode = PowerMode.NORMAL;
-          console.log(`${this.config.id}: Waking to normal mode`);
+          cmdLogger.info(`Waking to normal mode`, { powerMode: PowerMode.NORMAL });
           break;
 
         case CommandType.SET_REPORTING:
@@ -263,20 +270,22 @@ class IoTDeviceSimulator {
               this.reportStatus();
             }, this.config.reportingInterval);
 
-            console.log(`${this.config.id}: Reporting interval changed to ${command.payload.interval}s`);
+            cmdLogger.info(`Reporting interval changed`, {
+              newIntervalSeconds: command.payload.interval,
+              newIntervalMs: newInterval
+            });
           }
           break;
 
         case CommandType.GET_STATUS:
           // Reply immediately with current status
+          cmdLogger.debug(`Status request received, sending current status`);
           this.reportStatus();
           break;
 
         default:
-          console.log(`${this.config.id}: Unrecognized command: ${command.type}`);
-      }
-
-      // Send command response if requestId is present
+          cmdLogger.warn(`Unrecognized command received`, { commandType: command.type });
+      }      // Send command response if requestId is present
       if (command.requestId) {
         this.sendCommandResponse(command, true);
       }
@@ -285,7 +294,7 @@ class IoTDeviceSimulator {
       this.reportStatus();
 
     } catch (err) {
-      console.error(`${this.config.id}: Error processing command:`, err);
+      this.logger.error(`Error processing command`, err);
     }
   }
 
@@ -307,9 +316,15 @@ class IoTDeviceSimulator {
       timestamp: Date.now()
     };
 
+    const responseLogger = command.requestId
+      ? this.logger.withCorrelationId(command.requestId)
+      : this.logger;
+
     this.client.publish(responseTopic, JSON.stringify(response), { qos: 1 }, (err) => {
       if (err) {
-        console.error(`${this.config.id}: Error sending command response:`, err);
+        responseLogger.error(`Error sending command response`, err);
+      } else {
+        responseLogger.debug(`Command response sent`, { response, topic: responseTopic });
       }
     });
   }
@@ -319,6 +334,15 @@ class IoTDeviceSimulator {
  * Run the device simulator with multiple devices
  */
 async function runSimulator() {
+  // Create a simulator logger with unique correlation ID
+  const simulatorId = 'sim-' + Math.random().toString(36).substring(2, 8);
+  const simulatorLogger = Logger.child('device-simulator').withCorrelationId(simulatorId);
+
+  simulatorLogger.info('Initializing device simulator', {
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+
   // Create simulated devices
   const devices = [
     new IoTDeviceSimulator({
@@ -351,24 +375,30 @@ async function runSimulator() {
   ];
 
   // Connect all devices
+  simulatorLogger.info('Connecting simulated devices', { deviceCount: devices.length });
+
   for (const device of devices) {
     try {
       await device.connect();
       await new Promise(resolve => setTimeout(resolve, 1000)); // Small delay between connections
     } catch (err) {
-      console.error('Failed to connect device:', err);
+      simulatorLogger.error('Failed to connect device', err);
     }
   }
 
   // Keep devices running until process is terminated
-  console.log('Device simulator running. Press Ctrl+C to exit.');
+  simulatorLogger.info('Device simulator running. Press Ctrl+C to exit.', {
+    activeDevices: devices.length,
+    startTime: new Date().toISOString()
+  });
 
   // Handle termination
   process.on('SIGINT', async () => {
-    console.log('\nDisconnecting devices...');
+    simulatorLogger.info('Termination signal received, disconnecting devices...');
     for (const device of devices) {
       await device.disconnect();
     }
+    simulatorLogger.info('All devices disconnected, exiting simulator');
     process.exit(0);
   });
 }
