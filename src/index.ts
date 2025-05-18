@@ -16,8 +16,9 @@ export { DeviceStatus, PowerMode, ConnectionStatus, GroupStatistics } from './ty
 export { DeviceCommand, CommandType, CommandResponse } from './types/command';
 
 // Export utilities
-export { EnergyManagerError, ErrorType } from './utils/error-handler';
+export { EnergyManagerError, ErrorType, ErrorSeverity, createErrorHandler } from './utils/error-handler';
 export { default as Logger } from './utils/logger';
+export { ValidationResult } from './utils/validators';
 
 // Library version
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
