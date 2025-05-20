@@ -103,8 +103,13 @@ jobs:
           name: Install typedoc
           command: npm install -g typedoc
       - run:
+          name: Prepare docs directory
+          command: |
+            mkdir -p docs
+            cp -r docs/* docs/ || true
+      - run:
           name: Generate documentation
-          command: typedoc --out docs src/index.ts
+          command: typedoc --options typedoc.json
       - store_artifacts:
           path: docs
       - persist_to_workspace:
