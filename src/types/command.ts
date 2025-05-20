@@ -5,22 +5,22 @@
  */
 export enum CommandType {
   /** Put device into power saving mode */
-  SLEEP = 'sleep',
+  SLEEP = "sleep",
 
   /** Exit power saving mode */
-  WAKE = 'wake',
+  WAKE = "wake",
 
   /** Restart the device */
-  RESTART = 'restart',
+  RESTART = "restart",
 
   /** Request firmware update */
-  UPDATE = 'update',
+  UPDATE = "update",
 
   /** Configure status reporting interval */
-  SET_REPORTING = 'set_reporting_interval',
+  SET_REPORTING = "set_reporting_interval",
 
   /** Request immediate status update */
-  GET_STATUS = 'get_status'
+  GET_STATUS = "get_status",
 }
 
 /**

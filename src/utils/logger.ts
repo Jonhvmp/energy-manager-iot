@@ -1,6 +1,6 @@
-import winston from 'winston';
-import path from 'path';
-import fs from 'fs';
+import winston from "winston";
+import path from "path";
+import fs from "fs";
 
 /**
  * Custom log levels with numeric priorities
@@ -12,14 +12,16 @@ const levels = {
   info: 2,
   http: 3,
   debug: 4,
-  trace: 5
+  trace: 5,
 };
 
 // Set log level based on environment
-const level = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
+const level =
+  process.env.LOG_LEVEL ||
+  (process.env.NODE_ENV === "production" ? "info" : "debug");
 
 // Create logs directory if it doesn't exist
-const logDir = 'logs';
+const logDir = "logs";
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir);
 }
@@ -27,38 +29,43 @@ if (!fs.existsSync(logDir)) {
 /**
  * Custom formatter that intelligently formats objects and arrays
  */
-const smartFormat = winston.format((info: winston.Logform.TransformableInfo) => {
-  const args = info.args as any[] || [];
+const smartFormat = winston.format(
+  (info: winston.Logform.TransformableInfo) => {
+    const args = (info.args as any[]) || [];
 
-  // Process each argument for better formatting
-  if (args && Array.isArray(args) && args.length > 0) {
-    info.metadata = info.metadata || {};
+    // Process each argument for better formatting
+    if (args && Array.isArray(args) && args.length > 0) {
+      info.metadata = info.metadata || {};
 
-    // TypeScript workaround to access arbitrary properties
-    const metadata = info.metadata as Record<string, any>;
-    metadata.details = args.map((arg: any) => {
-      if (arg instanceof Error) {
-        return {
-          errorMessage: arg.message,
-          stack: arg.stack,
-          ...(Object.getOwnPropertyNames(arg).reduce((obj, key) => {
-            obj[key] = (arg as any)[key];
-            return obj;
-          }, {} as Record<string, any>))
-        };
-      }
-      return arg;
-    });
-  }
+      // TypeScript workaround to access arbitrary properties
+      const metadata = info.metadata as Record<string, any>;
+      metadata.details = args.map((arg: any) => {
+        if (arg instanceof Error) {
+          return {
+            errorMessage: arg.message,
+            stack: arg.stack,
+            ...Object.getOwnPropertyNames(arg).reduce(
+              (obj, key) => {
+                obj[key] = (arg as any)[key];
+                return obj;
+              },
+              {} as Record<string, any>,
+            ),
+          };
+        }
+        return arg;
+      });
+    }
 
-  return info;
-});
+    return info;
+  },
+);
 
 /**
  * Log formatting configuration for console output
  */
 const consoleFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
+  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss.SSS" }),
   winston.format.colorize({ all: false }),
   winston.format.padLevels(),
   winston.format.printf((info: winston.Logform.TransformableInfo) => {
@@ -84,8 +91,12 @@ const consoleFormat = winston.format.combine(
       if (metadata.details && Array.isArray(metadata.details)) {
         // Format each detailed item on new line
         const detailsText = metadata.details
-          .map((detail: any) => typeof detail === 'object' ? JSON.stringify(detail, null, 2) : String(detail))
-          .join('\n  ');
+          .map((detail: any) =>
+            typeof detail === "object"
+              ? JSON.stringify(detail, null, 2)
+              : String(detail),
+          )
+          .join("\n  ");
         if (detailsText.trim()) {
           logMessage += `\n  ${detailsText}`;
         }
@@ -96,7 +107,7 @@ const consoleFormat = winston.format.combine(
     }
 
     return logMessage;
-  })
+  }),
 );
 
 /**
@@ -106,7 +117,7 @@ const fileFormat = winston.format.combine(
   winston.format.timestamp(),
   smartFormat(),
   winston.format.errors({ stack: true }),
-  winston.format.json()
+  winston.format.json(),
 );
 
 /**
@@ -116,34 +127,34 @@ const transports = [
   // Console transport for all environments
   new winston.transports.Console({
     format: consoleFormat,
-    handleExceptions: true
+    handleExceptions: true,
   }),
 
   // File transports for all environments
   new winston.transports.File({
-    filename: path.join(logDir, 'error.log'),
-    level: 'error',
+    filename: path.join(logDir, "error.log"),
+    level: "error",
     format: fileFormat,
     maxsize: 10485760, // 10MB
     maxFiles: 5,
-    handleExceptions: true
+    handleExceptions: true,
   }),
 
   new winston.transports.File({
-    filename: path.join(logDir, 'combined.log'),
+    filename: path.join(logDir, "combined.log"),
     format: fileFormat,
     maxsize: 10485760, // 10MB
-    maxFiles: 5
-  })
+    maxFiles: 5,
+  }),
 ];
 
 // Create logger instance with Winston
 const winstonLogger = winston.createLogger({
   level,
   levels,
-  defaultMeta: { service: 'energy-manager' },
+  defaultMeta: { service: "energy-manager" },
   transports,
-  exitOnError: false
+  exitOnError: false,
 });
 
 /**
@@ -174,7 +185,7 @@ class EnhancedLogger {
   child(module: string, correlationId?: string): EnhancedLogger {
     return new EnhancedLogger(
       module || this.module,
-      correlationId || this.correlationId
+      correlationId || this.correlationId,
     );
   }
 
@@ -199,7 +210,7 @@ class EnhancedLogger {
     winstonLogger.error(msg, {
       module: this.module,
       correlationId: this.correlationId,
-      args
+      args,
     });
   }
 
@@ -213,7 +224,7 @@ class EnhancedLogger {
     winstonLogger.warn(msg, {
       module: this.module,
       correlationId: this.correlationId,
-      args
+      args,
     });
   }
 
@@ -227,7 +238,7 @@ class EnhancedLogger {
     winstonLogger.info(msg, {
       module: this.module,
       correlationId: this.correlationId,
-      args
+      args,
     });
   }
 
@@ -241,7 +252,7 @@ class EnhancedLogger {
     winstonLogger.debug(msg, {
       module: this.module,
       correlationId: this.correlationId,
-      args
+      args,
     });
   }
 
@@ -252,10 +263,10 @@ class EnhancedLogger {
    * @param args - Additional data to include in the log
    */
   trace(msg: string, ...args: any[]): void {
-    winstonLogger.log('trace', msg, {
+    winstonLogger.log("trace", msg, {
       module: this.module,
       correlationId: this.correlationId,
-      args
+      args,
     });
   }
 
@@ -269,9 +280,9 @@ class EnhancedLogger {
     winstonLogger.http(msg, {
       module: this.module,
       correlationId: this.correlationId,
-      args
+      args,
     });
   }
 }
 
-export default new EnhancedLogger('core');
+export default new EnhancedLogger("core");

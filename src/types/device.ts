@@ -1,4 +1,4 @@
-import { DeviceStatus } from './status';
+import { DeviceStatus } from "./status";
 
 /**
  * IoT device types
@@ -7,19 +7,19 @@ import { DeviceStatus } from './status';
  */
 export enum DeviceType {
   /** Device that collects environmental or system data */
-  SENSOR = 'sensor',
+  SENSOR = "sensor",
 
   /** Device that captures visual data */
-  CAMERA = 'camera',
+  CAMERA = "camera",
 
   /** Device that controls or affects physical systems */
-  ACTUATOR = 'actuator',
+  ACTUATOR = "actuator",
 
   /** Device that connects and bridges other devices */
-  GATEWAY = 'gateway',
+  GATEWAY = "gateway",
 
   /** General purpose device that doesn't fit other categories */
-  GENERIC = 'generic'
+  GENERIC = "generic",
 }
 
 /**

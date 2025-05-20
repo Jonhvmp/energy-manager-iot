@@ -1,9 +1,9 @@
-import { DeviceCommand, CommandType } from '../types/command';
-import { DeviceConfig } from '../types/device';
-import Logger from './logger';
+import { DeviceCommand, CommandType } from "../types/command";
+import { DeviceConfig } from "../types/device";
+import Logger from "./logger";
 
 // Module-specific logger
-const logger = Logger.child('validators');
+const logger = Logger.child("validators");
 
 /**
  * Validation result with details
@@ -32,7 +32,9 @@ export function validateDeviceId(id: string, logResults = false): boolean {
     if (valid) {
       logger.debug(`Device ID validation passed: "${id}"`);
     } else {
-      logger.warn(`Device ID validation failed: "${id}" - Must be 3-50 alphanumeric chars, hyphens, underscores`);
+      logger.warn(
+        `Device ID validation failed: "${id}" - Must be 3-50 alphanumeric chars, hyphens, underscores`,
+      );
     }
   }
 
@@ -58,7 +60,9 @@ export function validateGroupName(name: string, logResults = false): boolean {
     if (valid) {
       logger.debug(`Group name validation passed: "${name}"`);
     } else {
-      logger.warn(`Group name validation failed: "${name}" - Must be 2-50 chars, only alphanumeric, spaces, hyphens`);
+      logger.warn(
+        `Group name validation failed: "${name}" - Must be 2-50 chars, only alphanumeric, spaces, hyphens`,
+      );
     }
   }
 
@@ -76,7 +80,10 @@ export function validateGroupName(name: string, logResults = false): boolean {
  * Valid URLs must start with mqtt:// or mqtts:// and contain a properly
  * formed host name with optional port number.
  */
-export function validateMqttBrokerUrl(url: string, logResults = false): boolean {
+export function validateMqttBrokerUrl(
+  url: string,
+  logResults = false,
+): boolean {
   // Check if URL is valid for MQTT (mqtt:// or mqtts://)
   const valid = /^mqtt(s)?:\/\/[a-zA-Z0-9_.-]+(\:[0-9]+)?$/.test(url);
 
@@ -84,7 +91,9 @@ export function validateMqttBrokerUrl(url: string, logResults = false): boolean 
     if (valid) {
       logger.debug(`MQTT broker URL validation passed: "${url}"`);
     } else {
-      logger.warn(`MQTT broker URL validation failed: "${url}" - Must start with mqtt:// or mqtts:// and have valid hostname`);
+      logger.warn(
+        `MQTT broker URL validation failed: "${url}" - Must start with mqtt:// or mqtts:// and have valid hostname`,
+      );
     }
   }
 
@@ -102,12 +111,15 @@ export function validateMqttBrokerUrl(url: string, logResults = false): boolean 
  * Validates that command type is valid, timestamp exists,
  * and command-specific requirements are met.
  */
-export function validateCommandDetailed(command: DeviceCommand, logResults = false): ValidationResult {
+export function validateCommandDetailed(
+  command: DeviceCommand,
+  logResults = false,
+): ValidationResult {
   // Check if command type is valid
   if (!Object.values(CommandType).includes(command.type)) {
     const result = {
       valid: false,
-      reason: `Invalid command type: "${command.type}"`
+      reason: `Invalid command type: "${command.type}"`,
     };
 
     if (logResults) {
@@ -118,10 +130,10 @@ export function validateCommandDetailed(command: DeviceCommand, logResults = fal
   }
 
   // Check timestamp
-  if (!command.timestamp || typeof command.timestamp !== 'number') {
+  if (!command.timestamp || typeof command.timestamp !== "number") {
     const result = {
       valid: false,
-      reason: 'Missing or invalid timestamp'
+      reason: "Missing or invalid timestamp",
     };
 
     if (logResults) {
@@ -132,11 +144,13 @@ export function validateCommandDetailed(command: DeviceCommand, logResults = fal
   }
 
   // Command-specific validations
-  if (command.type === CommandType.SET_REPORTING &&
-      (!command.payload || typeof command.payload.interval !== 'number')) {
+  if (
+    command.type === CommandType.SET_REPORTING &&
+    (!command.payload || typeof command.payload.interval !== "number")
+  ) {
     const result = {
       valid: false,
-      reason: 'SET_REPORTING command requires payload with numeric interval'
+      reason: "SET_REPORTING command requires payload with numeric interval",
     };
 
     if (logResults) {
@@ -149,7 +163,7 @@ export function validateCommandDetailed(command: DeviceCommand, logResults = fal
   if (logResults) {
     logger.debug(`Command validation passed: ${command.type}`, {
       type: command.type,
-      requestId: command.requestId
+      requestId: command.requestId,
     });
   }
 
@@ -167,7 +181,10 @@ export function validateCommandDetailed(command: DeviceCommand, logResults = fal
  * Validates that command type is valid, timestamp exists,
  * and command-specific requirements are met.
  */
-export function validateCommand(command: DeviceCommand, logResults = false): boolean {
+export function validateCommand(
+  command: DeviceCommand,
+  logResults = false,
+): boolean {
   return validateCommandDetailed(command, logResults).valid;
 }
 
@@ -181,12 +198,15 @@ export function validateCommand(command: DeviceCommand, logResults = false): boo
  * @remarks
  * Validates the ranges and types of configuration parameters.
  */
-export function validateDeviceConfigDetailed(config: DeviceConfig, logResults = false): ValidationResult {
+export function validateDeviceConfigDetailed(
+  config: DeviceConfig,
+  logResults = false,
+): ValidationResult {
   if (config.reportingInterval !== undefined) {
     if (config.reportingInterval < 1 || config.reportingInterval > 86400) {
       const result = {
         valid: false,
-        reason: `Invalid reportingInterval: ${config.reportingInterval} (must be between 1-86400)`
+        reason: `Invalid reportingInterval: ${config.reportingInterval} (must be between 1-86400)`,
       };
 
       if (logResults) {
@@ -201,7 +221,7 @@ export function validateDeviceConfigDetailed(config: DeviceConfig, logResults = 
     if (config.sleepThreshold < 0 || config.sleepThreshold > 100) {
       const result = {
         valid: false,
-        reason: `Invalid sleepThreshold: ${config.sleepThreshold} (must be between 0-100)`
+        reason: `Invalid sleepThreshold: ${config.sleepThreshold} (must be between 0-100)`,
       };
 
       if (logResults) {
@@ -216,7 +236,7 @@ export function validateDeviceConfigDetailed(config: DeviceConfig, logResults = 
     if (config.securityLevel < 1 || config.securityLevel > 5) {
       const result = {
         valid: false,
-        reason: `Invalid securityLevel: ${config.securityLevel} (must be between 1-5)`
+        reason: `Invalid securityLevel: ${config.securityLevel} (must be between 1-5)`,
       };
 
       if (logResults) {
@@ -228,11 +248,13 @@ export function validateDeviceConfigDetailed(config: DeviceConfig, logResults = 
   }
 
   if (logResults) {
-    logger.debug('Device configuration validation passed', { configSummary: {
-      reportingInterval: config.reportingInterval,
-      sleepThreshold: config.sleepThreshold,
-      securityLevel: config.securityLevel
-    }});
+    logger.debug("Device configuration validation passed", {
+      configSummary: {
+        reportingInterval: config.reportingInterval,
+        sleepThreshold: config.sleepThreshold,
+        securityLevel: config.securityLevel,
+      },
+    });
   }
 
   return { valid: true };
@@ -248,6 +270,9 @@ export function validateDeviceConfigDetailed(config: DeviceConfig, logResults = 
  * @remarks
  * Validates the ranges and types of configuration parameters.
  */
-export function validateDeviceConfig(config: DeviceConfig, logResults = false): boolean {
+export function validateDeviceConfig(
+  config: DeviceConfig,
+  logResults = false,
+): boolean {
   return validateDeviceConfigDetailed(config, logResults).valid;
 }

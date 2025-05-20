@@ -5,16 +5,16 @@
  */
 export enum PowerMode {
   /** Normal operation mode with full functionality */
-  NORMAL = 'normal',
+  NORMAL = "normal",
 
   /** Reduced power consumption mode with limited functionality */
-  LOW_POWER = 'low_power',
+  LOW_POWER = "low_power",
 
   /** Minimal power consumption hibernation mode */
-  SLEEP = 'sleep',
+  SLEEP = "sleep",
 
   /** Emergency mode due to critically low battery */
-  CRITICAL = 'critical'
+  CRITICAL = "critical",
 }
 
 /**
@@ -24,13 +24,13 @@ export enum PowerMode {
  */
 export enum ConnectionStatus {
   /** Device is connected and responsive */
-  ONLINE = 'online',
+  ONLINE = "online",
 
   /** Device is disconnected or unresponsive */
-  OFFLINE = 'offline',
+  OFFLINE = "offline",
 
   /** Device has unstable or intermittent connectivity */
-  INTERMITTENT = 'intermittent'
+  INTERMITTENT = "intermittent",
 }
 
 /**

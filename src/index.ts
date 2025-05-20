@@ -6,19 +6,29 @@
  */
 
 // Export main classes
-export { EnergyManager, EnergyManagerOptions } from './lib/energy-manager';
-export { MqttHandler, MqttHandlerOptions } from './lib/mqtt-handler';
-export { DeviceRegistry } from './lib/device-registry';
+export { EnergyManager, EnergyManagerOptions } from "./lib/energy-manager";
+export { MqttHandler, MqttHandlerOptions } from "./lib/mqtt-handler";
+export { DeviceRegistry } from "./lib/device-registry";
 
 // Export types
-export { Device, DeviceType, DeviceConfig } from './types/device';
-export { DeviceStatus, PowerMode, ConnectionStatus, GroupStatistics } from './types/status';
-export { DeviceCommand, CommandType, CommandResponse } from './types/command';
+export { Device, DeviceType, DeviceConfig } from "./types/device";
+export {
+  DeviceStatus,
+  PowerMode,
+  ConnectionStatus,
+  GroupStatistics,
+} from "./types/status";
+export { DeviceCommand, CommandType, CommandResponse } from "./types/command";
 
 // Export utilities
-export { EnergyManagerError, ErrorType, ErrorSeverity, createErrorHandler } from './utils/error-handler';
-export { default as Logger } from './utils/logger';
-export { ValidationResult } from './utils/validators';
+export {
+  EnergyManagerError,
+  ErrorType,
+  ErrorSeverity,
+  createErrorHandler,
+} from "./utils/error-handler";
+export { default as Logger } from "./utils/logger";
+export { ValidationResult } from "./utils/validators";
 
 // Library version
-export const VERSION = '1.1.1';
+export const VERSION = "1.1.1";

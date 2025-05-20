@@ -1,8 +1,12 @@
-import { Device, DeviceConfig, DeviceType } from '../types/device';
-import { DeviceStatus, PowerMode, ConnectionStatus } from '../types/status';
-import { validateDeviceId, validateGroupName, validateDeviceConfig } from '../utils/validators';
-import { EnergyManagerError, ErrorType } from '../utils/error-handler';
-import Logger from '../utils/logger';
+import { Device, DeviceConfig, DeviceType } from "../types/device";
+import { DeviceStatus, PowerMode, ConnectionStatus } from "../types/status";
+import {
+  validateDeviceId,
+  validateGroupName,
+  validateDeviceConfig,
+} from "../utils/validators";
+import { EnergyManagerError, ErrorType } from "../utils/error-handler";
+import Logger from "../utils/logger";
 
 /**
  * Manages IoT device registration and grouping
@@ -18,7 +22,7 @@ import Logger from '../utils/logger';
 export class DeviceRegistry {
   private devices: Map<string, Device>;
   private groups: Map<string, Set<string>>;
-  private logger = Logger.child('DeviceRegistry');
+  private logger = Logger.child("DeviceRegistry");
 
   constructor() {
     this.devices = new Map<string, Device>();
@@ -46,13 +50,13 @@ export class DeviceRegistry {
     name: string,
     type: DeviceType,
     config: DeviceConfig = {},
-    groups: string[] = []
+    groups: string[] = [],
   ): Device {
     // Validate ID
     if (!validateDeviceId(id)) {
       throw new EnergyManagerError(
         `Invalid device ID: ${id}`,
-        ErrorType.VALIDATION
+        ErrorType.VALIDATION,
       );
     }
 
@@ -60,7 +64,7 @@ export class DeviceRegistry {
     if (this.devices.has(id)) {
       throw new EnergyManagerError(
         `Device with ID ${id} already exists`,
-        ErrorType.VALIDATION
+        ErrorType.VALIDATION,
       );
     }
 
@@ -68,7 +72,7 @@ export class DeviceRegistry {
     if (!validateDeviceConfig(config)) {
       throw new EnergyManagerError(
         `Invalid configuration for device ${id}`,
-        ErrorType.VALIDATION
+        ErrorType.VALIDATION,
       );
     }
 
@@ -81,7 +85,7 @@ export class DeviceRegistry {
       groups: [],
       config,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     // Add to specified groups
@@ -89,13 +93,13 @@ export class DeviceRegistry {
       for (const groupName of groups) {
         this.addDeviceToGroup(id, groupName, device);
       }
-    }    // Store device
+    } // Store device
     this.devices.set(id, device);
     this.logger.info(`Device registered successfully`, {
       deviceId: id,
       deviceName: name,
       deviceType: type,
-      groupCount: groups.length
+      groupCount: groups.length,
     });
 
     return device;
@@ -109,7 +113,10 @@ export class DeviceRegistry {
    * @returns The updated device object
    * @throws {EnergyManagerError} If device not found or configuration is invalid
    */
-  public updateDevice(id: string, updates: Partial<Omit<Device, 'id' | 'createdAt'>>): Device {
+  public updateDevice(
+    id: string,
+    updates: Partial<Omit<Device, "id" | "createdAt">>,
+  ): Device {
     const device = this.getDevice(id);
 
     // Update properties
@@ -126,19 +133,19 @@ export class DeviceRegistry {
       if (!validateDeviceConfig(updates.config)) {
         throw new EnergyManagerError(
           `Invalid configuration for device ${id}`,
-          ErrorType.VALIDATION
+          ErrorType.VALIDATION,
         );
       }
       device.config = { ...device.config, ...updates.config };
     }
 
     // Update timestamp
-    device.updatedAt = Date.now();    // Update in map
+    device.updatedAt = Date.now(); // Update in map
     this.devices.set(id, device);
     this.logger.info(`Device updated`, {
       deviceId: id,
       updatedFields: Object.keys(updates),
-      timestamp: device.updatedAt
+      timestamp: device.updatedAt,
     });
 
     return device;
@@ -157,12 +164,12 @@ export class DeviceRegistry {
 
     // Update status and timestamp
     device.status = status;
-    device.updatedAt = Date.now();    // Update in map
+    device.updatedAt = Date.now(); // Update in map
     this.devices.set(id, device);
     this.logger.debug(`Device status updated`, {
       deviceId: id,
       connectionStatus: status.connectionStatus,
-      timestamp: device.updatedAt
+      timestamp: device.updatedAt,
     });
 
     return device;
@@ -188,12 +195,12 @@ export class DeviceRegistry {
       if (group) {
         group.delete(id);
       }
-    }    // Remove from registry
+    } // Remove from registry
     this.devices.delete(id);
     this.logger.info(`Device removed from registry`, {
       deviceId: id,
       deviceName: device.name,
-      removedFromGroups: device.groups
+      removedFromGroups: device.groups,
     });
 
     return true;
@@ -205,13 +212,15 @@ export class DeviceRegistry {
    * @param id - ID of the device to retrieve
    * @returns The device object
    * @throws {EnergyManagerError} If device not found
-   */  public getDevice(id: string): Device {
+   */ public getDevice(id: string): Device {
     const device = this.devices.get(id);
     if (!device) {
-      this.logger.warn(`Device lookup failed - device not found`, { deviceId: id });
+      this.logger.warn(`Device lookup failed - device not found`, {
+        deviceId: id,
+      });
       throw new EnergyManagerError(
         `Device not found: ${id}`,
-        ErrorType.DEVICE_NOT_FOUND
+        ErrorType.DEVICE_NOT_FOUND,
       );
     }
 
@@ -242,18 +251,18 @@ export class DeviceRegistry {
     if (!validateGroupName(name)) {
       throw new EnergyManagerError(
         `Invalid group name: ${name}`,
-        ErrorType.VALIDATION
+        ErrorType.VALIDATION,
       );
     }
 
     // Check if group already exists
     if (this.groups.has(name)) {
       return false;
-    }    // Create empty group
+    } // Create empty group
     this.groups.set(name, new Set<string>());
     this.logger.info(`Group created`, {
       groupName: name,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     return true;
@@ -268,12 +277,16 @@ export class DeviceRegistry {
    * @returns True if the device was added to the group
    * @throws {EnergyManagerError} If group name is invalid or device not found
    */
-  public addDeviceToGroup(deviceId: string, groupName: string, device?: Device): boolean {
+  public addDeviceToGroup(
+    deviceId: string,
+    groupName: string,
+    device?: Device,
+  ): boolean {
     // Validate group name
     if (!validateGroupName(groupName)) {
       throw new EnergyManagerError(
         `Invalid group name: ${groupName}`,
-        ErrorType.VALIDATION
+        ErrorType.VALIDATION,
       );
     }
 
@@ -294,12 +307,12 @@ export class DeviceRegistry {
       deviceRef.groups.push(groupName);
       deviceRef.updatedAt = Date.now();
       this.devices.set(deviceId, deviceRef);
-    }    // Log with device correlation ID
+    } // Log with device correlation ID
     this.logger.withCorrelationId(deviceId).debug(`Device added to group`, {
       deviceId,
       groupName,
       deviceGroups: deviceRef.groups,
-      groupSize: group.size
+      groupSize: group.size,
     });
     return true;
   }
@@ -317,7 +330,7 @@ export class DeviceRegistry {
     if (!this.groups.has(groupName)) {
       throw new EnergyManagerError(
         `Group not found: ${groupName}`,
-        ErrorType.GROUP_NOT_FOUND
+        ErrorType.GROUP_NOT_FOUND,
       );
     }
 
@@ -328,14 +341,17 @@ export class DeviceRegistry {
     if (removed) {
       // Remove group from device's group list
       const device = this.devices.get(deviceId);
-      if (device) {        device.groups = device.groups.filter(g => g !== groupName);
+      if (device) {
+        device.groups = device.groups.filter((g) => g !== groupName);
         device.updatedAt = Date.now();
         this.devices.set(deviceId, device);
-        this.logger.withCorrelationId(deviceId).debug(`Device removed from group`, {
-          deviceId,
-          groupName,
-          remainingGroups: device.groups.length
-        });
+        this.logger
+          .withCorrelationId(deviceId)
+          .debug(`Device removed from group`, {
+            deviceId,
+            groupName,
+            remainingGroups: device.groups.length,
+          });
       }
     }
 
@@ -361,16 +377,16 @@ export class DeviceRegistry {
     for (const deviceId of group) {
       const device = this.devices.get(deviceId);
       if (device) {
-        device.groups = device.groups.filter(g => g !== name);
+        device.groups = device.groups.filter((g) => g !== name);
         device.updatedAt = Date.now();
         this.devices.set(deviceId, device);
       }
-    }    // Remove the group
+    } // Remove the group
     this.groups.delete(name);
     this.logger.info(`Group removed`, {
       groupName: name,
       deviceCount: group.size,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     return true;
@@ -382,36 +398,39 @@ export class DeviceRegistry {
    * @param groupName - Name of the group to query
    * @returns Array of devices in the group
    * @throws {EnergyManagerError} If group not found
-   */  public getDevicesInGroup(groupName: string): Device[] {
+   */ public getDevicesInGroup(groupName: string): Device[] {
     // Check if group exists
     if (!this.groups.has(groupName)) {
       this.logger.warn(`Group lookup failed - group not found`, { groupName });
       throw new EnergyManagerError(
         `Group not found: ${groupName}`,
-        ErrorType.GROUP_NOT_FOUND
+        ErrorType.GROUP_NOT_FOUND,
       );
     }
 
     const group = this.groups.get(groupName)!;
-    const devices: Device[] = [];    // Collect all devices in the group
+    const devices: Device[] = []; // Collect all devices in the group
     for (const deviceId of group) {
       const device = this.devices.get(deviceId);
       if (device) {
         devices.push(device);
       } else {
         // Log inconsistency in data
-        this.logger.warn(`Data inconsistency detected: Device in group not found in registry`, {
-          groupName,
-          deviceId,
-          timestamp: Date.now()
-        });
+        this.logger.warn(
+          `Data inconsistency detected: Device in group not found in registry`,
+          {
+            groupName,
+            deviceId,
+            timestamp: Date.now(),
+          },
+        );
       }
     }
 
     this.logger.debug(`Retrieved devices in group`, {
       groupName,
       deviceCount: devices.length,
-      totalMembersInGroup: group.size
+      totalMembersInGroup: group.size,
     });
     return devices;
   }
@@ -422,20 +441,20 @@ export class DeviceRegistry {
    * @param groupName - Name of the group to query
    * @returns Array of device IDs in the group
    * @throws {EnergyManagerError} If group not found
-   */  public getDeviceIdsInGroup(groupName: string): string[] {
+   */ public getDeviceIdsInGroup(groupName: string): string[] {
     // Check if group exists
     if (!this.groups.has(groupName)) {
       this.logger.warn(`Group lookup failed - group not found`, { groupName });
       throw new EnergyManagerError(
         `Group not found: ${groupName}`,
-        ErrorType.GROUP_NOT_FOUND
+        ErrorType.GROUP_NOT_FOUND,
       );
     }
 
     const deviceIds = Array.from(this.groups.get(groupName)!);
     this.logger.trace(`Retrieved device IDs from group`, {
       groupName,
-      deviceCount: deviceIds.length
+      deviceCount: deviceIds.length,
     });
     return deviceIds;
   }
@@ -444,7 +463,7 @@ export class DeviceRegistry {
    * Retrieves all existing group names
    *
    * @returns Array of group names
-   */  public getAllGroups(): string[] {
+   */ public getAllGroups(): string[] {
     const groups = Array.from(this.groups.keys());
     this.logger.trace(`Retrieved all groups`, { groupCount: groups.length });
     return groups;
@@ -454,7 +473,7 @@ export class DeviceRegistry {
    * Retrieves all devices in the registry
    *
    * @returns Array of all devices
-   */  public getAllDevices(): Device[] {
+   */ public getAllDevices(): Device[] {
     const devices = Array.from(this.devices.values());
     this.logger.trace(`Retrieved all devices`, { deviceCount: devices.length });
     return devices;
@@ -464,9 +483,11 @@ export class DeviceRegistry {
    * Retrieves all device IDs in the registry
    *
    * @returns Array of all device IDs
-   */  public getAllDeviceIds(): string[] {
+   */ public getAllDeviceIds(): string[] {
     const deviceIds = Array.from(this.devices.keys());
-    this.logger.trace(`Retrieved all device IDs`, { deviceCount: deviceIds.length });
+    this.logger.trace(`Retrieved all device IDs`, {
+      deviceCount: deviceIds.length,
+    });
     return deviceIds;
   }
 }

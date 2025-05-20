@@ -1,22 +1,22 @@
-import Logger from './logger';
+import Logger from "./logger";
 
 /**
  * Custom error types for the Energy Manager system
  */
 export enum ErrorType {
-  CONNECTION = 'connection_error',
-  VALIDATION = 'validation_error',
-  AUTHENTICATION = 'authentication_error',
-  DEVICE_NOT_FOUND = 'device_not_found',
-  GROUP_NOT_FOUND = 'group_not_found',
-  COMMAND_FAILED = 'command_failed',
-  CONFIGURATION_ERROR = 'configuration_error',
-  TIMEOUT_ERROR = 'timeout_error',
-  MESSAGE_FORMAT_ERROR = 'message_format_error',
-  PROTOCOL_ERROR = 'protocol_error',
-  PERMISSION_DENIED = 'permission_denied',
-  RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
-  INTERNAL_ERROR = 'internal_error'
+  CONNECTION = "connection_error",
+  VALIDATION = "validation_error",
+  AUTHENTICATION = "authentication_error",
+  DEVICE_NOT_FOUND = "device_not_found",
+  GROUP_NOT_FOUND = "group_not_found",
+  COMMAND_FAILED = "command_failed",
+  CONFIGURATION_ERROR = "configuration_error",
+  TIMEOUT_ERROR = "timeout_error",
+  MESSAGE_FORMAT_ERROR = "message_format_error",
+  PROTOCOL_ERROR = "protocol_error",
+  PERMISSION_DENIED = "permission_denied",
+  RATE_LIMIT_EXCEEDED = "rate_limit_exceeded",
+  INTERNAL_ERROR = "internal_error",
 }
 
 /**
@@ -25,16 +25,16 @@ export enum ErrorType {
  */
 export enum ErrorSeverity {
   /** Critical errors requiring immediate attention */
-  CRITICAL = 'critical',
+  CRITICAL = "critical",
 
   /** High-impact errors affecting system functionality */
-  HIGH = 'high',
+  HIGH = "high",
 
   /** Medium-impact errors affecting specific features */
-  MEDIUM = 'medium',
+  MEDIUM = "medium",
 
   /** Low-impact errors with minimal functional impact */
-  LOW = 'low'
+  LOW = "low",
 }
 
 /**
@@ -76,10 +76,10 @@ export class EnergyManagerError extends Error {
     type: ErrorType,
     data?: any,
     severity: ErrorSeverity = ErrorSeverity.MEDIUM,
-    correlationId?: string
+    correlationId?: string,
   ) {
     super(message);
-    this.name = 'EnergyManagerError';
+    this.name = "EnergyManagerError";
     this.type = type;
     this.data = data;
     this.severity = severity;
@@ -89,7 +89,9 @@ export class EnergyManagerError extends Error {
     // Generate error code based on type and timestamp
     // Format: EM-{TYPE_PREFIX}-{TIMESTAMP}
     const typePrefix = type.slice(0, 4).toUpperCase();
-    const timeCode = Math.floor(this.timestamp.getTime() / 1000).toString(36).slice(-6);
+    const timeCode = Math.floor(this.timestamp.getTime() / 1000)
+      .toString(36)
+      .slice(-6);
     this.code = `EM-${typePrefix}-${timeCode}`;
 
     // Correctly capture stack trace in TypeScript
@@ -112,7 +114,7 @@ export class EnergyManagerError extends Error {
       timestamp: this.timestamp.toISOString(),
       correlationId: this.correlationId,
       data: this.data,
-      stack: this.stack
+      stack: this.stack,
     };
   }
 }
@@ -129,16 +131,18 @@ export function createErrorHandler(moduleName: string) {
   return function handleModuleError(
     error: Error | EnergyManagerError,
     context?: string,
-    correlationId?: string
+    correlationId?: string,
   ): never {
     // Create logger with correlation ID if provided
-    const logger = correlationId ? moduleLogger.withCorrelationId(correlationId) : moduleLogger;
+    const logger = correlationId
+      ? moduleLogger.withCorrelationId(correlationId)
+      : moduleLogger;
 
     // If it's our custom error, log with additional information
     if (error instanceof EnergyManagerError) {
       logger.error(
-        `[${error.type}]${context ? ` (${context})` : ''}: ${error.message}`,
-        error.toJSON()
+        `[${error.type}]${context ? ` (${context})` : ""}: ${error.message}`,
+        error.toJSON(),
       );
     } else {
       // Convert standard errors to our format for consistent handling
@@ -147,12 +151,12 @@ export function createErrorHandler(moduleName: string) {
         ErrorType.INTERNAL_ERROR,
         { originalStack: error.stack },
         ErrorSeverity.MEDIUM,
-        correlationId
+        correlationId,
       );
 
       logger.error(
-        `[UNEXPECTED_ERROR]${context ? ` (${context})` : ''}: ${error.message}`,
-        wrappedError.toJSON()
+        `[UNEXPECTED_ERROR]${context ? ` (${context})` : ""}: ${error.message}`,
+        wrappedError.toJSON(),
       );
     }
 
@@ -173,21 +177,23 @@ export function createErrorHandler(moduleName: string) {
 export function handleError(
   error: Error | EnergyManagerError,
   context?: string,
-  correlationId?: string
+  correlationId?: string,
 ): never {
-  const logger = correlationId ? Logger.withCorrelationId(correlationId) : Logger;
+  const logger = correlationId
+    ? Logger.withCorrelationId(correlationId)
+    : Logger;
 
   // If it's our custom error, log with additional information
   if (error instanceof EnergyManagerError) {
     logger.error(
-      `[${error.type}]${context ? ` (${context})` : ''}: ${error.message}`,
-      error.toJSON()
+      `[${error.type}]${context ? ` (${context})` : ""}: ${error.message}`,
+      error.toJSON(),
     );
   } else {
     // For other errors
     logger.error(
-      `[UNEXPECTED_ERROR]${context ? ` (${context})` : ''}: ${error.message}`,
-      { stack: error.stack }
+      `[UNEXPECTED_ERROR]${context ? ` (${context})` : ""}: ${error.message}`,
+      { stack: error.stack },
     );
   }
 
