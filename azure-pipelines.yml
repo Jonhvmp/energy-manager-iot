@@ -12,19 +12,16 @@ trigger:
     include:
       - v*
 
+# Adicione esta linha para habilitar os recursos de pipeline YAML
+resources:
+  repositories:
+    - repository: self
+
+# Use o pipeline com estágios
+name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.r)
+
 pool:
   vmImage: 'ubuntu-latest'
-
-strategy:
-  matrix:
-    node_14_x:
-      node_version: '14.x'
-    node_16_x:
-      node_version: '16.x'
-    node_18_x:
-      node_version: '18.x'
-    node_20_x:
-      node_version: '20.x'
 
 variables:
   npm_config_cache: $(Pipeline.Workspace)/.npm
@@ -35,6 +32,16 @@ stages:
     displayName: 'Validação do código'
     jobs:
       - job: Lint_Format_Test
+        strategy:
+          matrix:
+            node_14_x:
+              node_version: '14.x'
+            node_16_x:
+              node_version: '16.x'
+            node_18_x:
+              node_version: '18.x'
+            node_20_x:
+              node_version: '20.x'
         displayName: 'Lint, Format e Test'
         steps:
           - task: NodeTool@0
@@ -224,4 +231,4 @@ stages:
             inputs:
               pathToPublish: 'docs'
               artifactName: 'docs'
-            displayName: 'Publicar documentação'  
+            displayName: 'Publicar documentação'
