@@ -103,11 +103,6 @@ jobs:
           name: Install typedoc
           command: npm install -g typedoc
       - run:
-          name: Install TypeDoc and plugins
-          command: |
-            npm install -g typedoc@0.24.8
-            npm install -g typedoc-plugin-markdown@3.15.3
-      - run:
           name: Prepare docs directory
           command: |
             mkdir -p docs
