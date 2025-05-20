@@ -5,14 +5,12 @@
   "includeVersion": true,
   "excludePrivate": true,
   "excludeExternals": true,
-  "includeDeclarations": true,
-  "plugin": ["typedoc-plugin-markdown"],
-  "disableSources": false,
-  "categorizeByGroup": true,
   "searchInComments": true,
+  "categorizeByGroup": true,
+  "plugin": ["typedoc-plugin-markdown"],
   "validation": {
-    "notExported": false,
     "invalidLink": true,
+    "notExported": false,
     "notDocumented": false
   }
 }

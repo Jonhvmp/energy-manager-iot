@@ -103,10 +103,15 @@ jobs:
           name: Install typedoc
           command: npm install -g typedoc
       - run:
+          name: Install TypeDoc and plugins
+          command: |
+            npm install -g typedoc
+            npm install -g typedoc-plugin-markdown
+      - run:
           name: Prepare docs directory
           command: |
             mkdir -p docs
-            cp -r docs/* docs/ || true
+            cp -r $(pwd)/docs/* docs/ || true
       - run:
           name: Generate documentation
           command: typedoc --options typedoc.json
