@@ -1,0 +1,227 @@
+# Azure DevOps Pipeline para Energy Manager IoT
+# Realiza build, testes, análise de qualidade e publicação
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+      - feature/*
+      - release/*
+  tags:
+    include:
+      - v*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+strategy:
+  matrix:
+    node_14_x:
+      node_version: '14.x'
+    node_16_x:
+      node_version: '16.x'
+    node_18_x:
+      node_version: '18.x'
+    node_20_x:
+      node_version: '20.x'
+
+variables:
+  npm_config_cache: $(Pipeline.Workspace)/.npm
+  YARN_CACHE_FOLDER: $(Pipeline.Workspace)/.yarn
+
+stages:
+  - stage: Validate
+    displayName: 'Validação do código'
+    jobs:
+      - job: Lint_Format_Test
+        displayName: 'Lint, Format e Test'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '$(node_version)'
+            displayName: 'Instalar Node.js $(node_version)'
+
+          - task: Cache@2
+            inputs:
+              key: 'npm | "$(Agent.OS)" | package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: '$(npm_config_cache)'
+            displayName: 'Cache npm'
+
+          - script: |
+              npm ci
+            displayName: 'Instalar dependências'
+
+          - script: |
+              npm run lint
+            displayName: 'Lint do código'
+            continueOnError: true
+
+          - script: |
+              npm run format -- --check
+            displayName: 'Verificar formatação'
+            continueOnError: true
+
+          - script: |
+              npm run test:coverage
+              ls -la coverage
+            displayName: 'Executar testes unitários'
+            
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'junit.xml'
+              searchFolder: '$(System.DefaultWorkingDirectory)'
+              failTaskOnFailedTests: true
+              testRunTitle: 'Testes Unitários Node $(node_version)'
+            displayName: 'Publicar resultados de testes'
+            condition: succeededOrFailed()
+
+          - task: PublishCodeCoverageResults@1
+            inputs:
+              codeCoverageTool: 'Cobertura'
+              summaryFileLocation: '$(System.DefaultWorkingDirectory)/coverage/cobertura-coverage.xml'
+              reportDirectory: '$(System.DefaultWorkingDirectory)/coverage'
+            displayName: 'Publicar cobertura de código'
+            condition: succeededOrFailed()
+            
+  - stage: Build
+    displayName: 'Build e análise'
+    dependsOn: Validate
+    condition: succeeded()
+    jobs:
+      - job: Build_and_Analyze
+        displayName: 'Build e Análise'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '20.x'
+            displayName: 'Instalar Node.js'
+
+          - task: Cache@2
+            inputs:
+              key: 'npm | "$(Agent.OS)" | package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: '$(npm_config_cache)'
+            displayName: 'Cache npm'
+
+          - script: |
+              npm ci
+            displayName: 'Instalar dependências'
+            
+          - task: SonarCloudPrepare@1
+            inputs:
+              SonarCloud: 'SonarCloud'
+              organization: '$(SONAR_ORGANIZATION)'
+              scannerMode: 'CLI'
+              configMode: 'manual'
+              cliProjectKey: 'energy-manager-iot'
+              cliProjectName: 'Energy Manager IoT'
+              cliSources: 'src'
+              extraProperties: |
+                sonar.javascript.lcov.reportPaths=coverage/lcov.info
+                sonar.typescript.tsconfigPath=tsconfig.json
+                sonar.coverage.exclusions=**/*.test.ts,**/__tests__/**/*
+                sonar.exclusions=node_modules/**,coverage/**,dist/**
+            displayName: 'Preparar análise do SonarCloud'
+            env:
+              SONAR_ORGANIZATION: $(SONAR_ORGANIZATION)
+            continueOnError: true
+            
+          - script: |
+              npm run build
+            displayName: 'Build do projeto'
+
+          - script: |
+              npm run test:coverage
+            displayName: 'Executar testes com cobertura'
+            
+          - task: SonarCloudAnalyze@1
+            displayName: 'Executar análise do SonarCloud'
+            continueOnError: true
+            
+          - task: SonarCloudPublish@1
+            inputs:
+              pollingTimeoutSec: '300'
+            displayName: 'Publicar resultados do SonarCloud'
+            continueOnError: true
+            
+          - task: CopyFiles@2
+            inputs:
+              contents: |
+                dist/**
+                package.json
+                README.md
+              targetFolder: '$(Build.ArtifactStagingDirectory)'
+            displayName: 'Preparar artefatos para publicação'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)'
+              artifactName: 'npm-package'
+            displayName: 'Publicar artefatos'
+
+  - stage: Release
+    displayName: 'Release'
+    dependsOn: Build
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+    jobs:
+      - job: Publish_NPM
+        displayName: 'Publicar no NPM'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '20.x'
+            displayName: 'Instalar Node.js'
+
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'npm-package'
+              downloadPath: '$(System.DefaultWorkingDirectory)'
+            displayName: 'Download artifacts'
+
+          - script: |
+              cd $(System.DefaultWorkingDirectory)/npm-package
+              echo "//registry.npmjs.org/:_authToken=$(NPM_TOKEN)" > .npmrc
+              npm publish --access public
+            displayName: 'Publicar para NPM Registry'
+            env:
+              NPM_TOKEN: $(NPM_TOKEN)
+
+  - stage: Documentation
+    displayName: 'Documentação'
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: Generate_Docs
+        displayName: 'Gerar documentação'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '20.x'
+            displayName: 'Instalar Node.js'
+
+          - task: Cache@2
+            inputs:
+              key: 'npm | "$(Agent.OS)" | package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: '$(npm_config_cache)'
+            displayName: 'Cache npm'
+
+          - script: |
+              npm ci
+              npm install -g typedoc
+              typedoc --out docs src/index.ts
+            displayName: 'Gerar documentação'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: 'docs'
+              artifactName: 'docs'
+            displayName: 'Publicar documentação'  
