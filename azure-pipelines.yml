@@ -12,12 +12,10 @@ trigger:
     include:
       - v*
 
-# Adicione esta linha para habilitar os recursos de pipeline YAML
 resources:
   repositories:
     - repository: self
 
-# Use o pipeline com estágios
 name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.r)
 
 pool:
@@ -34,8 +32,6 @@ stages:
       - job: Lint_Format_Test
         strategy:
           matrix:
-            node_14_x:
-              node_version: '14.x'
             node_16_x:
               node_version: '16.x'
             node_18_x:
@@ -44,6 +40,9 @@ stages:
               node_version: '20.x'
         displayName: 'Lint, Format e Test'
         steps:
+          - checkout: self
+            displayName: 'Checkout do código fonte'
+
           - task: NodeTool@0
             inputs:
               versionSpec: '$(node_version)'
@@ -86,11 +85,11 @@ stages:
             displayName: 'Publicar resultados de testes'
             condition: succeededOrFailed()
 
-          - task: PublishCodeCoverageResults@1
+          - task: PublishCodeCoverageResults@2
             inputs:
-              codeCoverageTool: 'Cobertura'
               summaryFileLocation: '$(System.DefaultWorkingDirectory)/coverage/cobertura-coverage.xml'
-              reportDirectory: '$(System.DefaultWorkingDirectory)/coverage'
+              pathToSources: '$(System.DefaultWorkingDirectory)/src'
+              failIfCoverageEmpty: false
             displayName: 'Publicar cobertura de código'
             condition: succeededOrFailed()
             
@@ -102,6 +101,9 @@ stages:
       - job: Build_and_Analyze
         displayName: 'Build e Análise'
         steps:
+          - checkout: self
+            displayName: 'Checkout do código fonte'
+
           - task: NodeTool@0
             inputs:
               versionSpec: '20.x'
@@ -119,7 +121,7 @@ stages:
               npm ci
             displayName: 'Instalar dependências'
             
-          - task: SonarCloudPrepare@1
+          - task: SonarCloudPrepare@3
             inputs:
               SonarCloud: 'SonarCloud'
               organization: '$(SONAR_ORGANIZATION)'
@@ -146,11 +148,11 @@ stages:
               npm run test:coverage
             displayName: 'Executar testes com cobertura'
             
-          - task: SonarCloudAnalyze@1
+          - task: SonarCloudAnalyze@3
             displayName: 'Executar análise do SonarCloud'
             continueOnError: true
             
-          - task: SonarCloudPublish@1
+          - task: SonarCloudPublish@3
             inputs:
               pollingTimeoutSec: '300'
             displayName: 'Publicar resultados do SonarCloud'
@@ -179,6 +181,9 @@ stages:
       - job: Publish_NPM
         displayName: 'Publicar no NPM'
         steps:
+          - checkout: self
+            displayName: 'Checkout do código fonte'
+
           - task: NodeTool@0
             inputs:
               versionSpec: '20.x'
@@ -208,6 +213,9 @@ stages:
       - job: Generate_Docs
         displayName: 'Gerar documentação'
         steps:
+          - checkout: self
+            displayName: 'Checkout do código fonte'
+
           - task: NodeTool@0
             inputs:
               versionSpec: '20.x'
