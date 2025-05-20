@@ -33,7 +33,6 @@
   "description": "Library for energy management in IoT devices via MQTT protocol. Documentation: https://jonhvmp.github.io/energy-manager-iot-docs/",
   "homepage": "https://jonhvmp.github.io/energy-manager-iot-docs/",
   "dependencies": {
-    "energy-manager-iot": "^1.1.1",
     "mqtt": "^5.0.3",
     "winston": "^3.10.0"
   },
