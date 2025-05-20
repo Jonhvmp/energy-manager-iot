@@ -106,7 +106,12 @@ jobs:
           name: Prepare docs directory
           command: |
             mkdir -p docs
-            cp -r $(pwd)/docs/* docs/ || true
+            cp -r ./docs/* ./docs/ || true
+            echo "Conteúdo de docs antes da cópia:"
+            ls -la ./docs
+            cp ./docs/logging.md ./docs/ || echo "Arquivo logging.md não encontrado na origem"
+            echo "Verificando se logging.md existe:"
+            ls -la ./docs
       - run:
           name: Generate documentation
           command: typedoc --options typedoc.json
