@@ -1,109 +1,44 @@
-# CircleCI configuration for Energy Manager IoT
 version: 2.1
 
-orbs:
-  node: circleci/node@5.1.0
-  codecov: codecov/codecov@3.2.4
-
 jobs:
-  lint-and-format:
+  auto-create-config:
     docker:
-      - image: cimg/node:20.10.0
+      - image: circleci/config-setup:latest
     steps:
       - checkout
-      - node/install-packages
       - run:
-          name: Run linting
-          command: npm run lint
-      - run:
-          name: Check formatting
-          command: npm run format -- --check
-
-  test:
+          name: Generate Config
+          command: config-setup generate-and-add-config << pipeline.id >>
+  playwright-e2e-test:
     docker:
-      - image: cimg/node:20.10.0
+      - image: mcr.microsoft.com/playwright:v1.43.1-jammy
     steps:
       - checkout
-      - node/install-packages
+      - restore_cache:
+          keys:
+            - npm-cache-{{ checksum "package-lock.json" }}
+            - npm-cache-
       - run:
-          name: Run tests with coverage
-          command: npm run test:coverage
-      - store_artifacts:
-          path: coverage
-      - store_test_results:
-          path: junit.xml
-      - codecov/upload
-
-  build:
-    docker:
-      - image: cimg/node:20.10.0
-    steps:
-      - checkout
-      - node/install-packages
-      - run:
-          name: Build library
-          command: npm run build
-      - persist_to_workspace:
-          root: .
+          name: Install dependencies
+          command: npm ci
+      - save_cache:
+          key: npm-cache-{{ checksum "package-lock.json" }}
           paths:
-            - dist
-            - package.json
-            - README.md
-
-  docs:
-    docker:
-      - image: cimg/node:20.10.0
-    steps:
-      - checkout
-      - node/install-packages
+            - ~/.npm
       - run:
-          name: Install typedoc
-          command: npm install -g typedoc
+          name: Install Playwright Browsers
+          command: npx playwright install --with-deps
       - run:
-          name: Generate documentation
-          command: typedoc --out docs src/index.ts
+          name: Run Playwright E2E Tests
+          command: npx playwright test
       - store_artifacts:
-          path: docs
-      - persist_to_workspace:
-          root: .
-          paths:
-            - docs
-
-  publish:
-    docker:
-      - image: cimg/node:20.10.0
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - node/install-packages
-      - run:
-          name: Authenticate with NPM
-          command: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
-      - run:
-          name: Publish to NPM
-          command: npm publish --access public
+          path: playwright-report
+          destination: playwright-report
 
 workflows:
-  version: 2
-  build-test-publish:
+  generate-config:
     jobs:
-      - lint-and-format
-      - test:
+      - auto-create-config
+      - playwright-e2e-test:
           requires:
-            - lint-and-format
-      - build:
-          requires:
-            - test
-      - docs:
-          requires:
-            - test
-      - publish:
-          requires:
-            - build
-            - docs
-          filters:
-            tags:
-              only: /^v.*/
-            branches:
-              ignore: /.*/
+            - auto-create-config
