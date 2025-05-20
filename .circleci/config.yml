@@ -1,44 +1,109 @@
+# CircleCI configuration for Energy Manager IoT
 version: 2.1
 
+orbs:
+  node: circleci/node@5.1.0
+  codecov: codecov/codecov@3.2.4
+
 jobs:
-  auto-create-config:
+  lint-and-format:
     docker:
-      - image: circleci/config-setup:latest
+      - image: cimg/node:20.10.0
     steps:
       - checkout
+      - node/install-packages
       - run:
-          name: Generate Config
-          command: config-setup generate-and-add-config << pipeline.id >>
-  playwright-e2e-test:
+          name: Run linting
+          command: npm run lint
+      - run:
+          name: Check formatting
+          command: npm run format -- --check
+
+  test:
     docker:
-      - image: mcr.microsoft.com/playwright:v1.43.1-jammy
+      - image: cimg/node:20.10.0
     steps:
       - checkout
-      - restore_cache:
-          keys:
-            - npm-cache-{{ checksum "package-lock.json" }}
-            - npm-cache-
+      - node/install-packages
       - run:
-          name: Install dependencies
-          command: npm ci
-      - save_cache:
-          key: npm-cache-{{ checksum "package-lock.json" }}
-          paths:
-            - ~/.npm
-      - run:
-          name: Install Playwright Browsers
-          command: npx playwright install --with-deps
-      - run:
-          name: Run Playwright E2E Tests
-          command: npx playwright test
+          name: Run tests with coverage
+          command: npm run test:coverage
       - store_artifacts:
-          path: playwright-report
-          destination: playwright-report
+          path: coverage
+      - store_test_results:
+          path: junit.xml
+      - codecov/upload
+
+  build:
+    docker:
+      - image: cimg/node:20.10.0
+    steps:
+      - checkout
+      - node/install-packages
+      - run:
+          name: Build library
+          command: npm run build
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist
+            - package.json
+            - README.md
+
+  docs:
+    docker:
+      - image: cimg/node:20.10.0
+    steps:
+      - checkout
+      - node/install-packages
+      - run:
+          name: Install typedoc
+          command: npm install -g typedoc
+      - run:
+          name: Generate documentation
+          command: typedoc --out docs src/index.ts
+      - store_artifacts:
+          path: docs
+      - persist_to_workspace:
+          root: .
+          paths:
+            - docs
+
+  publish:
+    docker:
+      - image: cimg/node:20.10.0
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - node/install-packages
+      - run:
+          name: Authenticate with NPM
+          command: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
+      - run:
+          name: Publish to NPM
+          command: npm publish --access public
 
 workflows:
-  generate-config:
+  version: 2
+  build-test-publish:
     jobs:
-      - auto-create-config
-      - playwright-e2e-test:
+      - lint-and-format
+      - test:
           requires:
-            - auto-create-config
+            - lint-and-format
+      - build:
+          requires:
+            - test
+      - docs:
+          requires:
+            - test
+      - publish:
+          requires:
+            - build
+            - docs
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
