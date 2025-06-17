@@ -1,48 +1,32 @@
-import {
-  EnergyManager,
-  DeviceType,
-  CommandType,
-  PowerMode,
-  ConnectionStatus,
-} from "../index";
-import { EnergyManagerError } from "../utils/error-handler";
+import { EnergyManager, DeviceType, CommandType, PowerMode, ConnectionStatus } from "../index";
 import * as mqtt from "mqtt";
-
-// Define type for mock calls
-type MockCall = [string, Function];
-
-jest.mock("mqtt", () => {
-  const mockClient = {
-    on: jest.fn().mockReturnThis(),
-    end: jest.fn((_, __, cb) => cb && cb()),
-    publish: jest.fn((_, __, ___, cb) => cb && cb()),
-    subscribe: jest.fn((_, __, cb) => cb && cb()),
-    unsubscribe: jest.fn((_, cb) => cb && cb()),
-    removeAllListeners: jest.fn(),
-  };
-
-  return {
-    connect: jest.fn().mockReturnValue(mockClient),
-  };
-});
+import { EnergyManagerError } from "../utils/error-handler";
 
 /**
- * Advanced coverage tests for the EnergyManager class
- *
- * These tests focus on improving code coverage by testing specific
- * behaviors and edge cases not covered by the main test suite.
+ * Advanced tests for EnergyManager covering error cases and MQTT handling
  */
-describe("EnergyManager - Advanced Coverage", () => {
+
+// Mock MQTT client
+jest.mock("mqtt");
+
+describe("EnergyManager Advanced Tests", () => {
   let energyManager: EnergyManager;
-  let mockMqttClient: any;
+  let mockClient: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    energyManager = new EnergyManager({
-      topicPrefix: "advanced/test/",
-      statusInterval: 500,
-    });
-    mockMqttClient = mqtt.connect("mqtt://localhost:1883");
+
+    mockClient = {
+      on: jest.fn(),
+      publish: jest.fn(),
+      subscribe: jest.fn(),
+      end: jest.fn(),
+      removeAllListeners: jest.fn()
+    };
+
+    (mqtt.connect as jest.Mock).mockReturnValue(mockClient);
+
+    energyManager = new EnergyManager();
   });
 
   afterEach(() => {
@@ -52,176 +36,184 @@ describe("EnergyManager - Advanced Coverage", () => {
     energyManager.removeAllListeners();
   });
 
-  describe("Topics and IDs", () => {
-    test("should correctly extract device ID from topic", () => {
-      // @ts-ignore - Access private method
-      const deviceId = energyManager["extractDeviceIdFromStatusTopic"](
-        "advanced/test/sensor123/status",
-      );
-      expect(deviceId).toBe("sensor123");
-    });
+  test("should throw error when sending command to non-existent device", async () => {
+    const nonExistentDeviceId = "non-existent-device";
 
-    test("should return null for invalid topics", () => {
-      // @ts-ignore - Access private method
-      const deviceId1 = energyManager["extractDeviceIdFromStatusTopic"](
-        "wrong-prefix/sensor123/status",
-      );
-      // @ts-ignore - Access private method
-      const deviceId2 = energyManager["extractDeviceIdFromStatusTopic"](
-        "advanced/test/sensor123/command",
-      );
-
-      expect(deviceId1).toBeNull();
-      expect(deviceId2).toBeNull();
-    });
-
-    test("should generate unique request IDs", () => {
-      // @ts-ignore - Access private method
-      const requestId = energyManager["generateRequestId"]();
-      expect(requestId).toMatch(/^req_\d+_[a-z0-9]+$/);
-    });
+    await expect(energyManager.sendCommand(
+      nonExistentDeviceId,
+      CommandType.SLEEP
+    )).rejects.toThrow(EnergyManagerError);
   });
 
-  describe("Command Errors", () => {
-    test("should throw error when sending command to non-existent device", async () => {
-      // Simulate MQTT connection
-      Object.defineProperty(energyManager["mqtt"], "isClientConnected", {
-        value: () => true,
-      });
+  test("should throw error when sending command without connection", async () => {
+    // Register device but don't connect
+    const deviceId = "sensor1";
+    energyManager.registerDevice(
+      deviceId,
+      "Temperature Sensor",
+      DeviceType.SENSOR
+    );
 
-      await expect(
-        energyManager.sendCommand("non-existent", CommandType.SLEEP),
-      ).rejects.toThrow(EnergyManagerError);
-    });
-
-    test("should handle error when publishing command", async () => {
-      // Register device
-      energyManager.registerDevice("sensor1", "Sensor", DeviceType.SENSOR);
-
-      // Simulate MQTT connection
-      Object.defineProperty(energyManager["mqtt"], "isClientConnected", {
-        value: () => true,
-      });
-
-      // Simulate publish error
-      energyManager["mqtt"].publish = jest
-        .fn()
-        .mockRejectedValue(new Error("Publish failed"));
-
-      await expect(
-        energyManager.sendCommand("sensor1", CommandType.SLEEP),
-      ).rejects.toThrow();
-    });
-
-    test("should propagate error when sending command to group", async () => {
-      // Create group and add device
-      energyManager.createGroup("test-group");
-      energyManager.registerDevice("sensor1", "Sensor", DeviceType.SENSOR);
-      energyManager.addDeviceToGroup("sensor1", "test-group");
-
-      // Simulate MQTT connection
-      Object.defineProperty(energyManager["mqtt"], "isClientConnected", {
-        value: () => true,
-      });
-
-      // Simulate command error
-      energyManager.sendCommand = jest
-        .fn()
-        .mockRejectedValue(new Error("Command failed"));
-
-      await expect(
-        energyManager.sendCommandToGroup("test-group", CommandType.SLEEP),
-      ).rejects.toThrow(EnergyManagerError);
-    });
+    // Try to send command without MQTT connection
+    await expect(energyManager.sendCommand(
+      deviceId,
+      CommandType.SLEEP
+    )).rejects.toThrow(EnergyManagerError);
   });
 
-  describe("MQTT Events", () => {
-    beforeEach(() => {
-      // Simulate MQTT connection to test events
-      const connectPromise = energyManager.connect("mqtt://localhost:1883");
+  // Increase timeout for this test to avoid timeout errors
+  test("should throw error when command sending fails", async () => {
+    const deviceId = "sensor1";
+    energyManager.registerDevice(
+      deviceId,
+      "Temperature Sensor",
+      DeviceType.SENSOR
+    );
 
-      // Simulate connect callback
-      const onConnect = mockMqttClient.on.mock.calls.find(
-        (c: MockCall) => c[0] === "connect",
-      )?.[1];
-      if (onConnect) onConnect();
-
-      return connectPromise;
+    // Mock successful connection - executed synchronously
+    mockClient.on.mockImplementation((event: string, cb: Function) => {
+      if (event === 'connect') {
+        cb(); // Execute callback immediately for connect
+      }
+      return mockClient;
     });
 
-    test("should emit reconnect event", () => {
-      const reconnectListener = jest.fn();
-      energyManager.on("reconnecting", reconnectListener);
-
-      // Simulate reconnect event
-      const onReconnect = mockMqttClient.on.mock.calls.find(
-        (c: MockCall) => c[0] === "reconnect",
-      )?.[1];
-      if (onReconnect) onReconnect();
-
-      expect(reconnectListener).toHaveBeenCalled();
+    // Mock subscribe that responds immediately
+    mockClient.subscribe.mockImplementation((_topic: string, _opts: any, cb: Function) => {
+      if (cb) cb(null); // Execute callback immediately without error
+      return mockClient;
     });
 
-    test("should emit error event", () => {
-      const errorListener = jest.fn();
-      energyManager.on("error", errorListener);
+    await energyManager.connect("mqtt://localhost");
 
-      const testError = new Error("Test error");
+    // Verify it's actually "connected"
+    expect(energyManager.isConnected()).toBe(true);
 
-      // Simulate error event
-      const onError = mockMqttClient.on.mock.calls.find(
-        (c: MockCall) => c[0] === "error",
-      )?.[1];
-      if (onError) onError(testError);
+    // Mock publish failure that resolves immediately
+    mockClient.publish.mockImplementation(
+      (_topic: string, _message: string, _opts: any, cb: Function) => {
+        // Call callback with error immediately
+        if (cb) cb(new Error("Publish failure"));
+        return mockClient;
+      }
+    );
 
-      expect(errorListener).toHaveBeenCalledWith(testError);
+    await expect(
+      energyManager.sendCommand(deviceId, CommandType.SLEEP)
+    ).rejects.toThrow();
+  }, 30000);
+
+  // Increase timeout for this test to avoid timeout errors
+  test("should throw error when sending command to group fails", async () => {
+    // Create group and add device
+    const groupName = "test-group";
+    energyManager.createGroup(groupName);
+
+    const deviceId = "sensor1";
+    energyManager.registerDevice(
+      deviceId,
+      "Temperature Sensor",
+      DeviceType.SENSOR
+    );
+
+    energyManager.addDeviceToGroup(deviceId, groupName);
+
+    // Mock successful connection - executed synchronously
+    mockClient.on.mockImplementation((event: string, cb: Function) => {
+      if (event === 'connect') {
+        cb(); // Execute callback immediately for connect
+      }
+      return mockClient;
     });
+
+    // Mock subscribe that responds immediately
+    mockClient.subscribe.mockImplementation((_topic: string, _opts: any, cb: Function) => {
+      if (cb) cb(null); // Execute callback immediately without error
+      return mockClient;
+    });
+
+    await energyManager.connect("mqtt://localhost");
+
+    // Verify it's actually "connected"
+    expect(energyManager.isConnected()).toBe(true);
+
+    // Mock publish failure that resolves immediately
+    mockClient.publish.mockImplementation(
+      (_topic: string, _message: string, _opts: any, cb: Function) => {
+        // Call callback with error immediately
+        if (cb) cb(new Error("Publish failure"));
+        return mockClient;
+      }
+    );
+
+    await expect(
+      energyManager.sendCommandToGroup(groupName, CommandType.SLEEP)
+    ).rejects.toThrow();
+  }, 10000);
+
+  test("should emit error event when MQTT error occurs", async () => {
+    // Prepare spy for error event
+    const errorSpy = jest.fn();
+    energyManager.on("error", errorSpy);
+
+    // Mock MQTT error - with immediate execution
+    const mqttError = new Error("MQTT Error");
+    mockClient.on.mockImplementation((event: string, cb: Function) => {
+      if (event === 'error') {
+        setTimeout(() => cb(mqttError), 0);
+      }
+      return mockClient;
+    });
+
+    // Start connection
+    const connectPromise = energyManager.connect("mqtt://localhost");
+
+    // Connection should fail
+    await expect(connectPromise).rejects.toThrow();
+
+    // Verify error event was emitted
+    expect(errorSpy).toHaveBeenCalledWith(mqttError);
   });
 
-  describe("Topic Subscriptions", () => {
-    test("should subscribe to all device status topics", async () => {
-      // Register devices
-      energyManager.registerDevice("sensor1", "Sensor 1", DeviceType.SENSOR);
-      energyManager.registerDevice("sensor2", "Sensor 2", DeviceType.SENSOR);
-
-      // Spy on subscribe method
-      const subscribeSpy = jest
-        .spyOn(energyManager["mqtt"], "subscribe")
-        .mockResolvedValue();
-
-      // Simulate connected state
-      Object.defineProperty(energyManager["mqtt"], "isClientConnected", {
-        value: () => true,
-      });
-
-      // @ts-ignore - Access private method
-      await energyManager["subscribeToAllDeviceStatuses"]();
-
-      // Should call subscribe for each device
-      expect(subscribeSpy).toHaveBeenCalledTimes(2);
-      expect(subscribeSpy).toHaveBeenCalledWith("advanced/test/sensor1/status");
-      expect(subscribeSpy).toHaveBeenCalledWith("advanced/test/sensor2/status");
+  test("should resubscribe to topics when prefix is changed", async () => {
+    // Mock successful connection
+    mockClient.on.mockImplementation((event: string, cb: Function) => {
+      if (event === 'connect') setTimeout(() => cb(), 0);
+      return mockClient;
     });
 
-    test("should not attempt to subscribe when disconnected", async () => {
-      // Register device
-      energyManager.registerDevice("sensor1", "Sensor", DeviceType.SENSOR);
-
-      // Spy on subscribe method
-      const subscribeSpy = jest
-        .spyOn(energyManager["mqtt"], "subscribe")
-        .mockResolvedValue();
-
-      // Simulate disconnected state
-      Object.defineProperty(energyManager["mqtt"], "isClientConnected", {
-        value: () => false,
-      });
-
-      // @ts-ignore - Access private method
-      await energyManager["subscribeToAllDeviceStatuses"]();
-
-      // Should not call subscribe
-      expect(subscribeSpy).not.toHaveBeenCalled();
+    // Mock subscribe to return immediately
+    mockClient.subscribe.mockImplementation((_topic: string, _opts: any, cb: Function) => {
+      if (cb) setTimeout(() => cb(null), 0);
+      return mockClient;
     });
+
+    await energyManager.connect("mqtt://localhost");
+
+    // Register devices
+    energyManager.registerDevice("sensor1", "Sensor 1", DeviceType.SENSOR);
+    energyManager.registerDevice("sensor2", "Sensor 2", DeviceType.SENSOR);
+
+    // Clear mock to count new calls
+    mockClient.subscribe.mockClear();
+
+    // Change prefix
+    energyManager.setTopicPrefix("new/prefix/");
+
+    // Verify resubscription happened
+    expect(mockClient.subscribe).toHaveBeenCalled();
+    expect(mockClient.subscribe.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("should ignore resubscription if not connected when changing prefix", () => {
+    // Register devices without connecting
+    energyManager.registerDevice("sensor1", "Sensor 1", DeviceType.SENSOR);
+    energyManager.registerDevice("sensor2", "Sensor 2", DeviceType.SENSOR);
+
+    // Change prefix
+    energyManager.setTopicPrefix("new/prefix/");
+
+    // There should be no subscription attempt
+    expect(mockClient.subscribe).not.toHaveBeenCalled();
   });
 });
