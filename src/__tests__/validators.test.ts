@@ -5,6 +5,9 @@ import {
   validateMqttBrokerUrl,
   validateCommand,
   validateDeviceConfig,
+  validateCommandDetailed,
+  validateDeviceConfigDetailed,
+  ValidationResult
 } from "../utils/validators";
 import { CommandType } from "../types/command";
 
@@ -149,6 +152,88 @@ describe("Validators", () => {
 
       expect(validateDeviceConfig({ securityLevel: 0 })).toBe(false);
       expect(validateDeviceConfig({ securityLevel: 6 })).toBe(false);
+    });
+  });
+
+  describe("validateCommandDetailed", () => {
+    test("should provide detailed validation results for valid commands", () => {
+      const result: ValidationResult = validateCommandDetailed({
+        type: CommandType.SLEEP,
+        timestamp: Date.now(),
+      }, true);
+
+      expect(result.valid).toBe(true);
+      expect(result.reason).toBeUndefined();
+    });
+
+    test("should provide detailed validation results for invalid commands", () => {
+      // Invalid type
+      let result: ValidationResult = validateCommandDetailed({
+        // @ts-ignore - Intentionally testing with invalid type
+        type: "invalid_command",
+        timestamp: Date.now(),
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain("Invalid command type");
+
+      // No timestamp
+      result = validateCommandDetailed({
+        type: CommandType.SLEEP,
+        // @ts-ignore - Testing without timestamp
+        timestamp: undefined,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain("Missing or invalid timestamp");
+
+      // SET_REPORTING without proper payload
+      result = validateCommandDetailed({
+        type: CommandType.SET_REPORTING,
+        timestamp: Date.now(),
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain("SET_REPORTING command requires payload");
+    });
+  });
+
+  describe("validateDeviceConfigDetailed", () => {
+    test("should provide detailed validation results for valid configurations", () => {
+      let result: ValidationResult = validateDeviceConfigDetailed({
+        reportingInterval: 60,
+        sleepThreshold: 15,
+        securityLevel: 3
+      }, true);
+
+      expect(result.valid).toBe(true);
+      expect(result.reason).toBeUndefined();
+    });
+
+    test("should provide detailed validation results for invalid configurations", () => {
+      // Invalid reporting interval
+      let result: ValidationResult = validateDeviceConfigDetailed({
+        reportingInterval: 0  // Invalid
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain("Invalid reportingInterval");
+
+      // Invalid sleep threshold
+      result = validateDeviceConfigDetailed({
+        sleepThreshold: 101  // Invalid
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain("Invalid sleepThreshold");
+
+      // Invalid security level
+      result = validateDeviceConfigDetailed({
+        securityLevel: 0  // Invalid
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain("Invalid securityLevel");
     });
   });
 });

@@ -170,3 +170,185 @@ describe("MqttHandler - Advanced Tests", () => {
     });
   });
 });
+
+/**
+ * Testes adicionais para o MqttHandler para aumentar a cobertura
+ */
+
+describe("MqttHandler Extended Tests", () => {
+  let mqttHandler: MqttHandler;
+  let mockClient: any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockClient = {
+      on: jest.fn(),
+      publish: jest.fn(),
+      subscribe: jest.fn(),
+      unsubscribe: jest.fn(),
+      end: jest.fn(),
+      removeAllListeners: jest.fn()
+    };
+
+    (mqtt.connect as jest.Mock).mockReturnValue(mockClient);
+
+    mqttHandler = new MqttHandler();
+  });
+
+  afterEach(() => {
+    mqttHandler.removeAllListeners();
+  });
+
+  test("deve lançar erro quando a publicação falha", async () => {
+    // Configurar mock de conexão bem-sucedida
+    mockClient.on.mockImplementation((event: string, cb: Function) => {
+      if (event === 'connect') setTimeout(() => cb(), 0);
+      return mockClient;
+    });
+
+    // Conectar
+    await mqttHandler.connect("mqtt://localhost:1883");
+
+    // Configurar mock de falha na publicação
+    const publishError = new Error("Falha na publicação");
+    mockClient.publish.mockImplementation(
+      (_topic: string, _message: string, _opts: any, cb: Function) => {
+        setTimeout(() => cb(publishError), 0);
+      }
+    );
+
+    // Tentar publicar
+    await expect(mqttHandler.publish("test/topic", { data: "test" }))
+      .rejects.toThrow(EnergyManagerError);
+  });
+
+  test("deve lançar erro quando a subscrição falha", async () => {
+    // Configurar mock de conexão bem-sucedida
+    mockClient.on.mockImplementation((event: string, cb: Function) => {
+      if (event === 'connect') setTimeout(() => cb(), 0);
+      return mockClient;
+    });
+
+    // Conectar
+    await mqttHandler.connect("mqtt://localhost:1883");
+
+    // Configurar mock de falha na subscrição
+    const subscribeError = new Error("Falha na subscrição");
+    mockClient.subscribe.mockImplementation(
+      (_topic: string, _opts: any, cb: Function) => {
+        setTimeout(() => cb(subscribeError), 0);
+      }
+    );
+
+    // Tentar subscrever
+    await expect(mqttHandler.subscribe("test/topic"))
+      .rejects.toThrow(EnergyManagerError);
+  });
+
+  test("deve lançar erro quando a cancelamento de subscrição falha", async () => {
+    // Configurar mock de conexão bem-sucedida
+    mockClient.on.mockImplementation((event: string, cb: Function) => {
+      if (event === 'connect') setTimeout(() => cb(), 0);
+      return mockClient;
+    });
+
+    // Conectar
+    await mqttHandler.connect("mqtt://localhost:1883");
+
+    // Configurar mock de falha no cancelamento de subscrição
+    const unsubscribeError = new Error("Falha no cancelamento de subscrição");
+    mockClient.unsubscribe.mockImplementation(
+      (_topic: string, cb: Function) => {
+        setTimeout(() => cb(unsubscribeError), 0);
+      }
+    );
+
+    // Tentar cancelar subscrição
+    await expect(mqttHandler.unsubscribe("test/topic"))
+      .rejects.toThrow(EnergyManagerError);
+  });
+
+  test("deve tratar erros durante inicialização do cliente", async () => {
+    // Mock para lançar exceção durante connect()
+    (mqtt.connect as jest.Mock).mockImplementation(() => {
+      throw new Error("Falha na inicialização");
+    });
+
+    // Tentar conectar
+    await expect(mqttHandler.connect("mqtt://localhost:1883"))
+      .rejects.toThrow(EnergyManagerError);
+  });
+
+  test("deve lançar erro na desconexão quando falha", async () => {
+    // Configurar mock de conexão bem-sucedida
+    mockClient.on.mockImplementation((event: string, cb: Function) => {
+      if (event === 'connect') setTimeout(() => cb(), 0);
+      return mockClient;
+    });
+
+    // Conectar
+    await mqttHandler.connect("mqtt://localhost:1883");
+
+    // Configurar mock de falha na desconexão
+    const disconnectError = new Error("Falha na desconexão");
+    mockClient.end.mockImplementation(
+      (_force: boolean, _opts: any, cb: Function) => {
+        setTimeout(() => cb(disconnectError), 0);
+      }
+    );
+
+    // Tentar desconectar
+    await expect(mqttHandler.disconnect())
+      .rejects.toThrow(EnergyManagerError);
+  });
+
+  // Aumentar o timeout deste teste para evitar erro de timeout
+  test("deve lidar com erros nos callbacks de mensagens", async () => {
+    // Configurar mock de conexão bem-sucedida
+    mockClient.on.mockImplementation((event: string, cb: Function) => {
+      if (event === 'connect') setTimeout(() => cb(), 0);
+      return mockClient;
+    });
+
+    // Conectar
+    await mqttHandler.connect("mqtt://localhost:1883");
+
+    // Registrar callback que lança erro
+    const callbackThatThrows = jest.fn().mockImplementation(() => {
+      throw new Error("Erro no callback");
+    });
+
+    // Configurar mock de subscrição para invocar o callback imediatamente
+    mockClient.subscribe.mockImplementation(
+      (_topic: string, _opts: any, cb: Function) => {
+        setTimeout(() => cb(null), 0);
+        return mockClient;
+      }
+    );
+
+    // Subscrever com callback problemático
+    await mqttHandler.subscribe("test/topic", callbackThatThrows);
+
+    // Simular recebimento de mensagem - não deve lançar exceção
+    const messageHandler = mockClient.on.mock.calls.find((call: any[]) => call[0] === 'message')?.[1];
+    expect(messageHandler).toBeDefined();
+
+    // Não deve lançar exceção quando o callback do tópico lança
+    if (messageHandler) {
+      expect(() => {
+        messageHandler("test/topic", Buffer.from("test message"));
+      }).not.toThrow();
+    }
+
+    // O callback deve ter sido chamado
+    expect(callbackThatThrows).toHaveBeenCalled();
+  }, 10000); // Aumentar timeout para 10 segundos
+
+  test("deve resolver imediatamente disconnect quando cliente é nulo", async () => {
+    // Não conecte, mantenha o cliente como null
+
+    // Tentar desconectar - deve resolver sem erro
+    await expect(mqttHandler.disconnect()).resolves.not.toThrow();
+  });
+});

@@ -1,0 +1,15 @@
+{
+  "entryPoints": ["src/index.ts"],
+  "out": "docs/api",
+  "readme": "README.md",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeExternals": true,
+  "searchInComments": true,
+  "categorizeByGroup": true,
+  "validation": {
+    "invalidLink": true,
+    "notExported": false,
+    "notDocumented": false
+  }
+}
